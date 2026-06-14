@@ -56,6 +56,12 @@
             <artifactId>FastCore</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- ONNX Runtime for local execution -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.17.1</version>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

@@ -1,45 +1,73 @@
 package fastaimodel;
 
-import java.util.function.Consumer;
-
 public class FastAIModel implements AutoCloseable {
 
     static {
         try {
-            System.loadLibrary("fastaimodel");
-        } catch (UnsatisfiedLinkError e1) {
-            try {
-                String dllPath = System.getProperty("user.dir") + "\\build\\fastaimodel.dll";
-                System.load(dllPath);
-            } catch (UnsatisfiedLinkError e2) {
-                // Fallback for compiler phase
+            String userDir = System.getProperty("user.dir");
+            
+            // Try build folder
+            String llamaPath = userDir + "\\build\\llama.dll";
+            String dllPath = userDir + "\\build\\fastaimodel.dll";
+            
+            // Check if running from subfolder
+            if (!new java.io.File(llamaPath).exists()) {
+                llamaPath = userDir + "\\llama.dll";
+                dllPath = userDir + "\\fastaimodel.dll";
             }
+            
+            System.out.println("Loading: " + llamaPath);
+            System.load(llamaPath);
+            System.out.println("Loading: " + dllPath);
+            System.load(dllPath);
+        } catch (UnsatisfiedLinkError e) {
+            System.err.println("Warning: JNI loading failed: " + e.getMessage());
+            // Fallback for compile-time
         }
     }
 
-    private final long modelHandle;
+    private long handle;
 
-    public FastAIModel(String modelPath, int contextSize, float temperature) {
-        this.modelHandle = nativeLoadModel(modelPath, contextSize, temperature);
-        if (this.modelHandle == 0) {
+    public interface TokenCallback {
+        void onToken(String token);
+    }
+
+    public FastAIModel(String modelPath) {
+        this(modelPath, 4096, 0);
+    }
+
+    public FastAIModel(String modelPath, int ctxSize, int gpuLayers) {
+        this.handle = nativeInit(modelPath, ctxSize, gpuLayers);
+        if (handle == 0) {
             throw new RuntimeException("Failed to load model: " + modelPath);
         }
     }
 
-    public void generate(String prompt, Consumer<String> tokenCallback) {
-        if (modelHandle == 0) throw new IllegalStateException("Model not loaded");
-        nativeGenerate(modelHandle, prompt, tokenCallback);
+    public void predict(String prompt, int maxTokens, TokenCallback cb) {
+        if (handle == 0) {
+            throw new IllegalStateException("Model is not initialized or has been closed");
+        }
+        nativePredict(handle, prompt, maxTokens, 0.7f, 0.9f, cb);
     }
 
     @Override
     public void close() {
-        if (modelHandle != 0) {
-            nativeFreeModel(modelHandle);
+        if (handle != 0) {
+            nativeFree(handle);
+            handle = 0;
         }
     }
 
-    // === JNI Native Methods ===
-    private static native long nativeLoadModel(String path, int contextSize, float temperature);
-    private static native void nativeGenerate(long handle, String prompt, Consumer<String> callback);
-    private static native void nativeFreeModel(long handle);
+    private static native long nativeInit(String modelPath, int ctxSize, int gpuLayers);
+
+    private static native void nativePredict(
+            long handle,
+            String prompt,
+            int maxTokens,
+            float temperature,
+            float topP,
+            TokenCallback callback
+    );
+
+    private static native void nativeFree(long handle);
 }
