@@ -7,10 +7,9 @@
 [![JitPack](https://img.shields.io/badge/JitPack-ready-green.svg)](https://jitpack.io/#andrestubbe)
 
 ---
-[README.md](../FastFrame/README.md)[README.md](../FastTUI/README.md)[README.md](../FastJava/README.md)
 **💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Zero-copy, Zero HTTP overhead, C++ native speed.**
-[README.md](../FastTUI/examples/README.md)
-FastAIModel is a **retained-memory local inference engine** for Java that w[README.md](../FastWakeWord/README.md)raps `llama.cpp` (for GGUF) and `ONNX Runtime` (for ONNX) using direct JNI bindings. It is the engine that drives offline execution in the **FastJava Ecosystem**, giving Java developers native LLM and embedding capabilities without keeping heavy external apps (like LM Studio or Ollama) open.
+
+FastAIModel is a **retained-memory local inference engine** for Java that wraps `llama.cpp` (for GGUF) and `ONNX Runtime` (for ONNX) using direct JNI bindings. It is the engine that drives offline execution in the **FastJava Ecosystem**, giving Java developers native LLM and embedding capabilities without keeping heavy external apps (like LM Studio or Ollama) open.
 
 ---
 [README.md](../FastTheme/README.md)
