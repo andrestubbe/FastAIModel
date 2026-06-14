@@ -6,6 +6,9 @@ public class Demo {
         System.out.println("----------------------------------------------------------------------");
 
         String modelPath = "../FastAI/examples/Demo/models/Llama-3.2-1B-Instruct-Q8_0.gguf";
+        if (!new java.io.File(modelPath).exists()) {
+            modelPath = "../../FastAI/examples/Demo/models/Llama-3.2-1B-Instruct-Q8_0.gguf";
+        }
 
         try (FastAIModel model = new FastAIModel(modelPath, 2048, 0)) {
             String prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" +
