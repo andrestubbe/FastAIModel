@@ -1,0 +1,5 @@
+LIBRARY fastaimodel
+EXPORTS
+    Java_fastaimodel_FastAIModel_nativeInit
+    Java_fastaimodel_FastAIModel_nativePredict
+    Java_fastaimodel_FastAIModel_nativeFree

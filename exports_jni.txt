@@ -1,0 +1,31 @@
+Microsoft (R) COFF/PE Dumper Version 14.44.35228.0
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+Dump of file build\fastaimodel.dll
+
+File Type: DLL
+
+  Section contains the following exports for fastaimodel.dll
+
+    00000000 characteristics
+    FFFFFFFF time date stamp
+        0.00 version
+           1 ordinal base
+           3 number of functions
+           3 number of names
+
+    ordinal hint RVA      name
+
+          1    0 00001420 Java_fastaimodel_FastAIModel_nativeFree
+          2    1 00001460 Java_fastaimodel_FastAIModel_nativeInit
+          3    2 00001690 Java_fastaimodel_FastAIModel_nativePredict
+
+  Summary
+
+        2000 .data
+        1000 .fptable
+        2000 .pdata
+        B000 .rdata
+        1000 .reloc
+        E000 .text
