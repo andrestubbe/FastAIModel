@@ -130,6 +130,14 @@ dependencies {
 
 ---
 
+## Related Projects
+
+- [FastAI](https://github.com/andrestubbe/FastAI) - Unified AI client interface for Java
+- [FastAIMemory](https://github.com/andrestubbe/FastAIMemory) - Unified conversation history and prompt formatters
+- [FastCore](https://github.com/andrestubbe/FastCore) - Unified JNI loader and platform abstraction
+
+---
+
 ## License
 
 MIT License — See [LICENSE](LICENSE) file for details.
