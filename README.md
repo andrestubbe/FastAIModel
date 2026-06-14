@@ -1,4 +1,4 @@
-# FastAIModel 0.1.0 [ALPHA] — Native Local Inference Runtime for Java
+# FastAIModel 0.1.0 [ALPHA-2026-06] — Native Local Inference Runtime for Java
 
 [![Status](https://img.shields.io/badge/status-0.1.0-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
