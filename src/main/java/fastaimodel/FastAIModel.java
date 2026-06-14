@@ -5,16 +5,16 @@ public class FastAIModel implements AutoCloseable {
     static {
         try {
             String userDir = System.getProperty("user.dir");
-            
-            // Try build folder
-            String llamaPath = userDir + "\\build\\llama.dll";
-            String dllPath = userDir + "\\build\\fastaimodel.dll";
-            
-            // Check if running from subfolder
-            if (!new java.io.File(llamaPath).exists()) {
-                llamaPath = userDir + "\\llama.dll";
-                dllPath = userDir + "\\fastaimodel.dll";
+            String libDir = userDir + "\\lib\\";
+            if (!new java.io.File(libDir + "llama.dll").exists()) {
+                libDir = userDir + "\\build\\";
             }
+            if (!new java.io.File(libDir + "llama.dll").exists()) {
+                libDir = userDir + "\\";
+            }
+            
+            String llamaPath = libDir + "llama.dll";
+            String dllPath = libDir + "fastaimodel.dll";
             
             System.out.println("Loading: " + llamaPath);
             System.load(llamaPath);
@@ -22,7 +22,6 @@ public class FastAIModel implements AutoCloseable {
             System.load(dllPath);
         } catch (UnsatisfiedLinkError e) {
             System.err.println("Warning: JNI loading failed: " + e.getMessage());
-            // Fallback for compile-time
         }
     }
 
