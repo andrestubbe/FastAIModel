@@ -4,24 +4,28 @@ public class FastAIModel implements AutoCloseable {
 
     static {
         try {
-            String userDir = System.getProperty("user.dir");
-            String libDir = userDir + "\\lib\\";
-            if (!new java.io.File(libDir + "llama.dll").exists()) {
-                libDir = userDir + "\\build\\";
+            fastcore.LibraryLoader.load("ggml", FastAIModel.class);
+            fastcore.LibraryLoader.load("llama-common", FastAIModel.class);
+            fastcore.LibraryLoader.load("llama", FastAIModel.class);
+            fastcore.LibraryLoader.load("fastaimodel", FastAIModel.class);
+        } catch (Throwable e) {
+            // Fallback to local file load for development environment
+            try {
+                String userDir = System.getProperty("user.dir");
+                String libDir = userDir + "\\lib\\";
+                if (!new java.io.File(libDir + "llama.dll").exists()) {
+                    libDir = userDir + "\\build\\";
+                }
+                if (!new java.io.File(libDir + "llama.dll").exists()) {
+                    libDir = userDir + "\\";
+                }
+                System.load(libDir + "ggml.dll");
+                System.load(libDir + "llama-common.dll");
+                System.load(libDir + "llama.dll");
+                System.load(libDir + "fastaimodel.dll");
+            } catch (UnsatisfiedLinkError ex) {
+                System.err.println("Warning: Native loading failed: " + ex.getMessage());
             }
-            if (!new java.io.File(libDir + "llama.dll").exists()) {
-                libDir = userDir + "\\";
-            }
-            
-            String llamaPath = libDir + "llama.dll";
-            String dllPath = libDir + "fastaimodel.dll";
-            
-            System.out.println("Loading: " + llamaPath);
-            System.load(llamaPath);
-            System.out.println("Loading: " + dllPath);
-            System.load(dllPath);
-        } catch (UnsatisfiedLinkError e) {
-            System.err.println("Warning: JNI loading failed: " + e.getMessage());
         }
     }
 

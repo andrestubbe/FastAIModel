@@ -1,0 +1,34 @@
+TITLE:
+FastAIModel: Native Local AI Inference in Java (LLM, GGUF & ONNX)
+
+DESCRIPTION:
+Showcasing the raw speed of FastAIModel, a retained-memory local inference engine for Java. Run local LLM and Text-to-Speech (TTS) models directly inside your JVM process with native JNI speed—no Ollama or LM Studio clients needed!
+
+This demo features:
+1. ONNX Inference: Running Piper's TTS model (en_US-danny-low.onnx) and playing the generated speech directly using Java Sound.
+2. Silent GGUF: The same Llama 3.2 model running silently with blazing-fast token streaming.
+3. GGUF Inference: Running Meta's Llama 3.2 1B model, showing full diagnostic logs.
+
+COMMANDS / EXECUTABLE PATHS IN THIS VIDEO:
+- run-onnx-demo.bat "..\FastBot\examples\Demo\en_US-danny-low.onnx"
+- run-silent-demo.bat "..\FastAI\examples\Demo\models\Llama-3.2-1B-Instruct-Q8_0.gguf"
+- run-gguf-demo.bat "..\FastAI\examples\Demo\models\Llama-3.2-1B-Instruct-Q8_0.gguf"
+
+TECHNICAL HIGHLIGHTS:
+- In-Process Execution: Loads models directly inside the JVM using direct JNI bindings (llama.cpp & ONNX Runtime), bypassing system sockets and HTTP overhead.
+- Zero-Copy Memory: Shared token handling minimizing JVM Garbage Collection stutters.
+- Offline-First: True local inference capabilities for the FastJava ecosystem.
+- Audio Integration: Real-time synthesis and playback using standard Java Sound APIs.
+
+GITHUB REPOSITORIES:
+- https://github.com/andrestubbe/FastAIModel
+- https://github.com/andrestubbe/FastAI
+- https://github.com/andrestubbe/FastBot
+- https://github.com/andrestubbe/FastCore
+
+OUR PHILOSOPHY:
+No copies. Ever. Critical JNI paths. Native-First performance.
+If you're interested in pushing the JVM to its absolute limits using native bindings, subscribe for more.
+
+TAGS:
+Java, FastJava, JNI, LLM, ONNX, GGUF, Llama.cpp, TextToSpeech, Performance, Software Engineering, Tech Demo
