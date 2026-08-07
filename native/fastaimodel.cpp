@@ -13,9 +13,18 @@ struct FastAIModelHandle {
 
 extern "C" {
 
+JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativeSetVerbose(JNIEnv* env, jclass clazz, jboolean verbose) {
+    if (verbose) {
+        llama_log_set(nullptr, nullptr);
+    } else {
+        llama_log_set([](ggml_log_level level, const char* text, void* user_data) {}, nullptr);
+    }
+}
+
 JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
     JNIEnv* env, jclass clazz, jstring jModelPath, jint ctxSize, jint gpuLayers) {
 
+    llama_log_set([](ggml_log_level level, const char* text, void* user_data) {}, nullptr);
     llama_backend_init();
 
     const char* modelPath = env->GetStringUTFChars(jModelPath, nullptr);
@@ -31,6 +40,7 @@ JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
     llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx = ctxSize;
     cparams.n_batch = ctxSize;
+    cparams.n_ubatch = ctxSize;
 
     llama_context* ctx = llama_new_context_with_model(model, cparams);
     if (!ctx) {
@@ -69,10 +79,14 @@ JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativePredict(
     if (n_tokens < 0) return;
     tokens.resize(n_tokens);
 
-    // Decode prompt
-    struct llama_batch batch = llama_batch_get_one(tokens.data(), tokens.size());
-    if (llama_decode(handle->ctx, batch) != 0) {
-        return;
+    // Decode prompt in chunks of 512 tokens using llama_batch_get_one
+    size_t chunk_size = 512;
+    for (size_t i = 0; i < tokens.size(); i += chunk_size) {
+        size_t n_eval = std::min(chunk_size, tokens.size() - i);
+        struct llama_batch batch = llama_batch_get_one(tokens.data() + i, (int32_t)n_eval);
+        if (llama_decode(handle->ctx, batch) != 0) {
+            return;
+        }
     }
 
     // Sampler setup

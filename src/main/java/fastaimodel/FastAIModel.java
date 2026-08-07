@@ -27,6 +27,9 @@ public class FastAIModel implements AutoCloseable {
                 System.err.println("Warning: Native loading failed: " + ex.getMessage());
             }
         }
+        try {
+            nativeSetVerbose(false);
+        } catch (Throwable ignored) {}
     }
 
     private long handle;
@@ -40,9 +43,10 @@ public class FastAIModel implements AutoCloseable {
     }
 
     public FastAIModel(String modelPath, int ctxSize, int gpuLayers) {
-        this.handle = nativeInit(modelPath, ctxSize, gpuLayers);
+        String resolvedPath = OllamaModelResolver.resolve(modelPath);
+        this.handle = nativeInit(resolvedPath, ctxSize, gpuLayers);
         if (handle == 0) {
-            throw new RuntimeException("Failed to load model: " + modelPath);
+            throw new RuntimeException("Failed to load model: " + resolvedPath);
         }
     }
 
@@ -60,6 +64,14 @@ public class FastAIModel implements AutoCloseable {
             handle = 0;
         }
     }
+
+    public static void setVerbose(boolean verbose) {
+        try {
+            nativeSetVerbose(verbose);
+        } catch (Throwable ignored) {}
+    }
+
+    private static native void nativeSetVerbose(boolean verbose);
 
     private static native long nativeInit(String modelPath, int ctxSize, int gpuLayers);
 

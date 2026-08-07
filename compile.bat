@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo ===========================================
-set "JAVA_HOME=C:\Program Files\Java\jdk-25"
+set "JAVA_HOME=C:\Program Files\Java\jdk-25.0.3"
 if not defined JAVA_HOME (
     set "JAVA_HOME=C:\Program Files\Java\jdk-17"
 )
@@ -20,8 +20,13 @@ call "%VCVARS%"
 if not exist build mkdir build
 
 echo.
-echo Generating llama.lib from llama.def...
-lib /def:llama.def /out:build\llama.lib /machine:x64
+echo Generating llama.lib from llama.dll...
+dumpbin /exports lib\llama.dll > build\llama.exports
+echo EXPORTS > build\llama.def
+for /f "tokens=4" %%a in ('findstr /R /C:"^[ ]*[0-9]" build\llama.exports') do (
+    echo %%a >> build\llama.def
+)
+lib /def:build\llama.def /out:build\llama.lib /machine:x64
 
 echo.
 echo Compiling FastAIModel JNI Bridge (C++)...

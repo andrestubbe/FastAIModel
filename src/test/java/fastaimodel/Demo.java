@@ -2,6 +2,7 @@ package fastaimodel;
 
 public class Demo {
     public static void main(String[] args) {
+        FastAIModel.setVerbose(true);
         System.out.println("Starting FastAIModel native streaming test with Llama-3.2-1B-Instruct...");
         System.out.println("----------------------------------------------------------------------");
 
