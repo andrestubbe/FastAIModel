@@ -16,12 +16,47 @@ FastAIModel is a **modular local inference engine** for Java that provides separ
 
 ---
 
+## Quick Start — ONNX Embeddings (`fastaimodel-onnx`)
+
+```java
+import fastaimodel.FastAIOnnxModel;
+import ai.onnxruntime.OrtSession;
+
+public class OnnxDemo {
+    public static void main(String[] args) {
+        // Load ONNX model directly without C++ Llama DLL dependencies
+        try (FastAIOnnxModel onnx = new FastAIOnnxModel("models/bge-micro-v2.onnx")) {
+            System.out.println("ONNX Session created successfully: " + onnx.getSession());
+        }
+    }
+}
+```
+
+## Quick Start — GGUF LLM In-Process Inference (`fastaimodel-llama`)
+
+```java
+import fastaimodel.FastAIModel;
+
+public class GgufDemo {
+    public static void main(String[] args) {
+        // Load local GGUF model via llama.cpp JNI bindings
+        try (FastAIModel model = new FastAIModel("models/qwen2.5-coder-1.5b.gguf")) {
+            model.predict("Write a quicksort in Java:", 128, token -> {
+                System.out.print(token);
+                System.out.flush();
+            });
+        }
+    }
+}
+```
+
+---
+
 ## Table of Contents
 
 - [Modular Architecture](#modular-architecture-new-in-012)
 - [Why FastAIModel?](#why-fastaimodel)
 - [Installation](#installation)
-- [Quick Start](#quick-start)
 - [Documentation](#documentation)
 - [Platform Support](#platform-support)
 - [License](#license)
@@ -90,33 +125,6 @@ If you want in-process C++ GGUF LLM execution via `llama.cpp`:
         <version>0.1.1</version>
     </dependency>
 </dependencies>
-```
-
----
-
-## Quick Start
-
-### ONNX Model Usage (`fastaimodel-onnx`)
-
-```java
-import fastaimodel.FastAIOnnxModel;
-
-try (FastAIOnnxModel onnx = new FastAIOnnxModel("models/model.onnx")) {
-    // Run ONNX inference
-    var result = onnx.run(inputs);
-}
-```
-
-### GGUF Model Usage (`fastaimodel-llama`)
-
-```java
-import fastaimodel.FastAIModel;
-
-try (FastAIModel model = new FastAIModel("models/qwen2.5-coder-1.5b.gguf")) {
-    model.predict("Write a quicksort in Java:", 128, token -> {
-        System.out.print(token);
-    });
-}
 ```
 
 ---
