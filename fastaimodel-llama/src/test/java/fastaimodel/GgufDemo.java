@@ -7,11 +7,14 @@ public class GgufDemo {
             modelArg = "llama3.2:1b";
         }
 
+        boolean verbose = Boolean.parseBoolean(System.getProperty("verbose", "true"));
+        if (verbose) {
+            FastAIModel.setVerbose(true);
+        }
+
         System.out.println("=== FastAIModel GGUF In-Process Demo ===");
         System.out.println("Model: " + modelArg);
         System.out.println();
-
-        FastAIModel.setVerbose(true);
 
         try (FastAIModel model = new FastAIModel(modelArg, 2048, 0)) {
             System.out.println("\n--- Generating ---");

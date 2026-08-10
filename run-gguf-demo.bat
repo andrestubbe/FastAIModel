@@ -9,6 +9,6 @@ if not "%MODEL_ARG%"=="" (
 chcp 65001 >nul
 cd fastaimodel-llama
 call mvn test-compile >nul 2>&1
-mvn -q exec:exec "-Dexec.executable=java" "-Dexec.workingdir=../lib" "-Dexec.classpathScope=test" "-Dexec.args=-Dmodel.path=\"%MODEL_ARG%\" -Dfile.encoding=UTF-8 -cp %%classpath fastaimodel.GgufDemo"
+mvn -q exec:exec "-Dexec.executable=java" "-Dexec.workingdir=../lib" "-Dexec.classpathScope=test" "-Dexec.args=-Dverbose=true -Dmodel.path=\"%MODEL_ARG%\" -Dfile.encoding=UTF-8 -cp %%classpath fastaimodel.GgufDemo"
 cd ..
 pause
