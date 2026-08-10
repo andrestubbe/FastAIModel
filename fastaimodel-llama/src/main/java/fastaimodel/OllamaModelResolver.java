@@ -49,18 +49,29 @@ public final class OllamaModelResolver {
         if (Files.exists(manifestPath)) {
             try {
                 String json = Files.readString(manifestPath);
-                Pattern pattern = Pattern.compile("\"digest\"\\s*:\\s*\"sha256:([a-f0-9]+)\"");
+                // Look specifically for model layer
+                Pattern pattern = Pattern.compile("\"mediaType\"\\s*:\\s*\"application/vnd.ollama.image.model\"\\s*,\\s*\"digest\"\\s*:\\s*\"sha256:([a-f0-9]+)\"");
                 Matcher matcher = pattern.matcher(json);
-                while (matcher.find()) {
+                if (matcher.find()) {
                     String hash = matcher.group(1);
                     Path blobPath = ollamaPath.resolve(Paths.get("blobs", "sha256-" + hash));
-                    if (Files.exists(blobPath) && Files.size(blobPath) > 10 * 1024 * 1024) { // GGUF model layer is larger than 10MB
-                        return blobPath.toAbsolutePath().toString();
+                    if (Files.exists(blobPath)) {
+                        return blobPath.toAbsolutePath().toString().replace('\\', '/');
+                    }
+                }
+                // Fallback to any blob > 10MB
+                Pattern anyPattern = Pattern.compile("\"digest\"\\s*:\\s*\"sha256:([a-f0-9]+)\"");
+                Matcher anyMatcher = anyPattern.matcher(json);
+                while (anyMatcher.find()) {
+                    String hash = anyMatcher.group(1);
+                    Path blobPath = ollamaPath.resolve(Paths.get("blobs", "sha256-" + hash));
+                    if (Files.exists(blobPath) && Files.size(blobPath) > 10 * 1024 * 1024) {
+                        return blobPath.toAbsolutePath().toString().replace('\\', '/');
                     }
                 }
             } catch (Exception ignored) {}
         }
 
-        return modelName;
+        return modelName.replace('\\', '/');
     }
 }
