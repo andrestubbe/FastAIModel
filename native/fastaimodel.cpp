@@ -18,26 +18,81 @@ struct FastAIModelHandle {
     const llama_vocab* vocab;
 };
 
+static bool g_verbose = false;
+
+static void quiet_log_callback(ggml_log_level level, const char* text, void* user_data) {
+    if (g_verbose) {
+        fprintf(stderr, "%s", text);
+    }
+}
+
+static void null_log_callback(ggml_log_level level, const char* text, void* user_data) {
+    // Completely suppress llama.cpp logging
+}
+
 extern "C" {
 
 JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativeSetVerbose(JNIEnv* env, jclass clazz, jboolean verbose) {
-    if (verbose) {
+    g_verbose = (verbose == JNI_TRUE);
+    if (g_verbose) {
         llama_log_set(nullptr, nullptr);
     } else {
-        llama_log_set([](ggml_log_level level, const char* text, void* user_data) {}, nullptr);
+        llama_log_set(null_log_callback, nullptr);
     }
 }
 
 JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
     JNIEnv* env, jclass clazz, jstring jModelPath, jint ctxSize, jint gpuLayers) {
 
+    if (!g_verbose) {
+        llama_log_set(null_log_callback, nullptr);
+    } else {
+        llama_log_set(nullptr, nullptr);
+    }
+
 #ifdef _WIN32
     SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
     AddDllDirectory(L"lib");
     AddDllDirectory(L".");
+
+    char dllPath[MAX_PATH] = {0};
+    HMODULE hModule = NULL;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          (LPCSTR)&Java_fastaimodel_FastAIModel_nativeInit, &hModule)) {
+        GetModuleFileNameA(hModule, dllPath, MAX_PATH);
+        std::string sPath(dllPath);
+        size_t lastSep = sPath.find_last_of("\\/");
+        if (lastSep != std::string::npos) {
+            std::string dir = sPath.substr(0, lastSep);
+            std::string baseDll = dir + "\\ggml-base.dll";
+            std::string ompDll  = dir + "\\libomp140.x86_64.dll";
+
+            LoadLibraryA(ompDll.c_str());
+            LoadLibraryA(baseDll.c_str());
+
+            // Load fastest available CPU backend: AVX2 > icelake > haswell > x64
+            const char* cpuVariants[] = {
+                "ggml-cpu-avx2.dll",
+                "ggml-cpu-icelake.dll",
+                "ggml-cpu-haswell.dll",
+                "ggml-cpu-x64.dll"
+            };
+            bool loaded = false;
+            for (const char* variant : cpuVariants) {
+                std::string dll = dir + "\\" + variant;
+                if (ggml_backend_load(dll.c_str()) != nullptr) {
+                    if (g_verbose) fprintf(stderr, "[FastAIModel] CPU backend: %s\n", variant);
+                    loaded = true;
+                    break;
+                }
+            }
+            ggml_backend_load_all_from_path(dir.c_str());
+        }
+    }
 #endif
 
     llama_backend_init();
+    ggml_backend_load_all();
 
     const char* modelPath = env->GetStringUTFChars(jModelPath, nullptr);
 
@@ -55,9 +110,11 @@ JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
     env->ReleaseStringUTFChars(jModelPath, modelPath);
 
     llama_context_params cparams = llama_context_default_params();
-    cparams.n_ctx = ctxSize;
-    cparams.n_batch = ctxSize;
+    cparams.n_ctx    = ctxSize;
+    cparams.n_batch  = ctxSize;
     cparams.n_ubatch = ctxSize;
+    cparams.n_threads = (uint32_t)std::thread::hardware_concurrency();
+    cparams.n_threads_batch = (uint32_t)std::thread::hardware_concurrency();
 
     llama_context* ctx = llama_new_context_with_model(model, cparams);
     if (!ctx) {

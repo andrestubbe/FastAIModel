@@ -56,7 +56,24 @@ public final class OllamaModelResolver {
                     String hash = matcher.group(1);
                     Path blobPath = ollamaPath.resolve(Paths.get("blobs", "sha256-" + hash));
                     if (Files.exists(blobPath)) {
-                        return blobPath.toAbsolutePath().toString().replace('\\', '/');
+                        String rawPath = blobPath.toAbsolutePath().toString().replace('\\', '/');
+                        try {
+                            Path ggufAlias = Paths.get(System.getProperty("java.io.tmpdir"), "ollama_" + hash.substring(0, 12) + ".gguf");
+                            if (!Files.exists(ggufAlias)) {
+                                try {
+                                    Files.createSymbolicLink(ggufAlias, blobPath);
+                                } catch (Throwable t) {
+                                    try {
+                                        Files.createLink(ggufAlias, blobPath);
+                                    } catch (Throwable t2) {
+                                        return rawPath;
+                                    }
+                                }
+                            }
+                            return ggufAlias.toAbsolutePath().toString().replace('\\', '/');
+                        } catch (Throwable ignored) {
+                            return rawPath;
+                        }
                     }
                 }
                 // Fallback to any blob > 10MB
@@ -65,8 +82,27 @@ public final class OllamaModelResolver {
                 while (anyMatcher.find()) {
                     String hash = anyMatcher.group(1);
                     Path blobPath = ollamaPath.resolve(Paths.get("blobs", "sha256-" + hash));
-                    if (Files.exists(blobPath) && Files.size(blobPath) > 10 * 1024 * 1024) {
-                        return blobPath.toAbsolutePath().toString().replace('\\', '/');
+                    if (Files.exists(blobPath) && Files.size(blobPath) > 10 * 1024 * 1024) { // GGUF model layer > 10MB
+                        String rawPath = blobPath.toAbsolutePath().toString().replace('\\', '/');
+                        // llama.cpp requires .gguf extension on some platforms/versions
+                        try {
+                            Path ggufAlias = Paths.get(System.getProperty("java.io.tmpdir"), "ollama_" + hash.substring(0, 12) + ".gguf");
+                            if (!Files.exists(ggufAlias)) {
+                                try {
+                                    Files.createSymbolicLink(ggufAlias, blobPath);
+                                } catch (Throwable t) {
+                                    // Fallback to hardlink or copy
+                                    try {
+                                        Files.createLink(ggufAlias, blobPath);
+                                    } catch (Throwable t2) {
+                                        return rawPath;
+                                    }
+                                }
+                            }
+                            return ggufAlias.toAbsolutePath().toString().replace('\\', '/');
+                        } catch (Throwable ignored) {
+                            return rawPath;
+                        }
                     }
                 }
             } catch (Exception ignored) {}

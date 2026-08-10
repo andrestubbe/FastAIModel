@@ -1,5 +1,7 @@
 package fastaimodel;
 
+import java.io.File;
+
 public class FastAIModel implements AutoCloseable {
 
     static {
@@ -10,24 +12,16 @@ public class FastAIModel implements AutoCloseable {
             fastcore.LibraryLoader.load("fastaimodel", FastAIModel.class);
         } catch (Throwable e) {
             // Fallback to local file load for development environment
-            try {
-                String userDir = System.getProperty("user.dir");
-                String libDir = userDir + "\\lib\\";
-                if (!new java.io.File(libDir + "llama.dll").exists()) {
-                    libDir = userDir + "\\build\\";
-                }
-                if (!new java.io.File(libDir + "llama.dll").exists()) {
-                    libDir = userDir + "\\";
-                }
-                if (new java.io.File(libDir + "libomp140.x86_64.dll").exists()) {
-                    try { System.load(libDir + "libomp140.x86_64.dll"); } catch (Throwable ignored) {}
-                }
-                System.load(libDir + "ggml.dll");
-                System.load(libDir + "llama-common.dll");
-                System.load(libDir + "llama.dll");
+            String libDir = new File("lib").getAbsolutePath() + File.separator;
+            if (new File(libDir + "fastaimodel.dll").exists()) {
+                try { System.load(libDir + "libomp140.x86_64.dll"); } catch (Throwable ignored) {}
+                try { System.load(libDir + "ggml-base.dll"); } catch (Throwable ignored) {}
+                try { System.load(libDir + "ggml.dll"); } catch (Throwable ignored) {}
+                try { System.load(libDir + "ggml-cpu-x64.dll"); } catch (Throwable ignored) {}
+                try { System.load(libDir + "llama.dll"); } catch (Throwable ignored) {}
                 System.load(libDir + "fastaimodel.dll");
-            } catch (UnsatisfiedLinkError ex) {
-                System.err.println("Warning: Native loading failed: " + ex.getMessage());
+            } else {
+                System.loadLibrary("fastaimodel");
             }
         }
         try {
