@@ -44,8 +44,12 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo Copying DLL to build folder...
-copy /Y build\fastaimodel.dll build\fastaimodel.dll
+echo Copying DLL to lib and target folders...
+copy /Y build\fastaimodel.dll lib\fastaimodel.dll
+if exist fastaimodel-llama\target\classes (
+    if not exist fastaimodel-llama\target\classes\native mkdir fastaimodel-llama\target\classes\native
+    copy /Y build\fastaimodel.dll fastaimodel-llama\target\classes\native\fastaimodel.dll
+)
 
 del /Q build\*.obj
 del /Q build\*.exp

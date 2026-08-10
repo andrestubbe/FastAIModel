@@ -5,6 +5,13 @@
 #include <chrono>
 #include "llama.h"
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 struct FastAIModelHandle {
     llama_model* model;
     llama_context* ctx;
@@ -24,7 +31,12 @@ JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativeSetVerbose(JNIEnv* env
 JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
     JNIEnv* env, jclass clazz, jstring jModelPath, jint ctxSize, jint gpuLayers) {
 
-    llama_log_set([](ggml_log_level level, const char* text, void* user_data) {}, nullptr);
+#ifdef _WIN32
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
+    AddDllDirectory(L"lib");
+    AddDllDirectory(L".");
+#endif
+
     llama_backend_init();
 
     const char* modelPath = env->GetStringUTFChars(jModelPath, nullptr);
@@ -33,9 +45,14 @@ JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
     mparams.n_gpu_layers = gpuLayers;
 
     llama_model* model = llama_load_model_from_file(modelPath, mparams);
-    env->ReleaseStringUTFChars(jModelPath, modelPath);
 
-    if (!model) return 0;
+    if (!model) {
+        printf("[FastAIModel C++] Error: llama_load_model_from_file failed for path: %s\n", modelPath);
+        fflush(stdout);
+        env->ReleaseStringUTFChars(jModelPath, modelPath);
+        return 0;
+    }
+    env->ReleaseStringUTFChars(jModelPath, modelPath);
 
     llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx = ctxSize;
