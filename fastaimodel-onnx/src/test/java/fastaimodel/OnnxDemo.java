@@ -4,13 +4,13 @@ import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtSession;
 
 import javax.sound.sampled.*;
-import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.nio.FloatBuffer;
 import java.nio.LongBuffer;
+import java.util.Map;
 
 /**
- * Piper TTS ONNX Inference Demo using FastAIOnnxModel.
- * Demonstrates in-process ONNX execution and audio playback capability.
+ * Full Piper TTS ONNX Audio Synthesis & Playback Demo.
  */
 public class OnnxDemo {
     public static void main(String[] args) {
@@ -24,41 +24,61 @@ public class OnnxDemo {
             }
         }
 
-        System.out.println("=== FastAIModel Piper TTS ONNX In-Process Demo ===");
+        System.out.println("=== FastAIModel Piper TTS ONNX Audio Synthesis Demo ===");
         System.out.println("ONNX Model: " + modelPath);
         System.out.println();
 
         try (FastAIOnnxModel onnx = new FastAIOnnxModel(modelPath)) {
             OrtSession session = onnx.getSession();
             System.out.println("✓ Piper TTS ONNX Model Loaded Successfully!");
-            System.out.println("  Input Nodes:  " + session.getInputNames());
-            System.out.println("  Output Nodes: " + session.getOutputNames());
+            System.out.println("  Inputs:  " + session.getInputNames());
+            System.out.println("  Outputs: " + session.getOutputNames());
 
-            // Simple dummy tensor execution test for input nodes
             if (session.getInputNames().contains("input")) {
-                long[] dummyPhonemes = new long[]{1, 10, 20, 30, 2};
-                long[] shape = {1, dummyPhonemes.length};
-                try (OnnxTensor inputTensor = OnnxTensor.createTensor(onnx.getEnv(), LongBuffer.wrap(dummyPhonemes), shape)) {
-                    System.out.println("✓ Created input phoneme tensor of shape [1, " + dummyPhonemes.length + "]");
-                }
-            }
+                // Phoneme sequence for test utterance
+                long[] phonemes = new long[]{1, 12, 45, 23, 67, 12, 89, 4, 2}; 
+                long[] lengths  = new long[]{phonemes.length};
+                float[] scales  = new float[]{0.667f, 1.0f, 0.8f}; // noiseScale, lengthScale, noiseW
 
-            System.out.println("\n✓ ONNX Runtime Environment ready for TTS audio generation.");
-            playTestBeep();
+                long[] shapePhonemes = {1, phonemes.length};
+                long[] shapeLengths  = {1};
+                long[] shapeScales   = {3};
+
+                try (OnnxTensor tInput   = OnnxTensor.createTensor(onnx.getEnv(), LongBuffer.wrap(phonemes), shapePhonemes);
+                     OnnxTensor tLengths = OnnxTensor.createTensor(onnx.getEnv(), LongBuffer.wrap(lengths),  shapeLengths);
+                     OnnxTensor tScales  = OnnxTensor.createTensor(onnx.getEnv(), FloatBuffer.wrap(scales),   shapeScales);
+                     OrtSession.Result result = session.run(Map.of(
+                         "input", tInput,
+                         "input_lengths", tLengths,
+                         "scales", tScales
+                     ))) {
+
+                    System.out.println("✓ ONNX Inference Execution Succeeded!");
+
+                    float[][][][] audioOutput = (float[][][][]) result.get(0).getValue();
+                    float[] samples = audioOutput[0][0][0];
+
+                    System.out.println(String.format("🔊 Generated %,d audio samples via Piper ONNX!", samples.length));
+
+                    playPcmSamples(samples, 22050);
+                }
+            } else {
+                System.out.println("✓ ONNX Model loaded (General Embedding / Non-Piper model).");
+            }
         } catch (Exception e) {
             System.err.println("Error in Piper ONNX Demo: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private static void playTestBeep() {
+    private static void playPcmSamples(float[] floatSamples, int sampleRate) {
         try {
-            int sampleRate = 22050;
-            byte[] pcm = new byte[sampleRate * 2]; // 1 second mono 16-bit
-            for (int i = 0; i < pcm.length / 2; i++) {
-                short sample = (short) (Math.sin(2 * Math.PI * i * 440.0 / sampleRate) * 8000);
-                pcm[i * 2]     = (byte) (sample & 0xff);
-                pcm[i * 2 + 1] = (byte) ((sample >> 8) & 0xff);
+            byte[] pcm = new byte[floatSamples.length * 2];
+            for (int i = 0; i < floatSamples.length; i++) {
+                float sample = Math.max(-1.0f, Math.min(1.0f, floatSamples[i]));
+                short val = (short) (sample * 32767.0f);
+                pcm[i * 2]     = (byte) (val & 0xff);
+                pcm[i * 2 + 1] = (byte) ((val >> 8) & 0xff);
             }
             AudioFormat format = new AudioFormat(sampleRate, 16, 1, true, false);
             DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
@@ -68,7 +88,9 @@ public class OnnxDemo {
                 line.write(pcm, 0, pcm.length);
                 line.drain();
             }
-            System.out.println("🔊 Played 440Hz test audio tone via Java Sound API!");
-        } catch (Exception ignored) {}
+            System.out.println("🎶 Played synthesized Piper audio through system speakers!");
+        } catch (Exception e) {
+            System.err.println("Audio playback error: " + e.getMessage());
+        }
     }
 }
