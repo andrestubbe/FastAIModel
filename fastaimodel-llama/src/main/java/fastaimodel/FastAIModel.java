@@ -19,6 +19,9 @@ public class FastAIModel implements AutoCloseable {
                 if (!new java.io.File(libDir + "llama.dll").exists()) {
                     libDir = userDir + "\\";
                 }
+                if (new java.io.File(libDir + "libomp140.x86_64.dll").exists()) {
+                    try { System.load(libDir + "libomp140.x86_64.dll"); } catch (Throwable ignored) {}
+                }
                 System.load(libDir + "ggml.dll");
                 System.load(libDir + "llama-common.dll");
                 System.load(libDir + "llama.dll");
