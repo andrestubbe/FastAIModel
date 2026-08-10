@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastAIModel</artifactId>
+        <version>0.1.2</version>
+    </parent>
+
+    <artifactId>fastaimodel-llama</artifactId>
+    <packaging>jar</packaging>
+
+    <name>fastaimodel-llama</name>
+    <description>Local GGUF / llama.cpp C++ inference runtime engine module for FastAIModel</description>
+
+    <dependencies>
+        <!-- FastCore - Unified JNI loader -->
+        <dependency>
+            <groupId>com.github.andrestubbe</groupId>
+            <artifactId>FastCore</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <!-- Include native DLL in JAR (loaded from parent build folder) -->
+            <resource>
+                <directory>../build</directory>
+                <targetPath>native</targetPath>
+                <includes>
+                    <include>*.dll</include>
+                </includes>
+            </resource>
+        </resources>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <workingDirectory>${project.basedir}/../lib</workingDirectory>
+                    <environmentVariables>
+                        <PATH>${project.basedir}/../lib;${env.PATH}</PATH>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

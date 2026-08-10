@@ -1,114 +1,83 @@
-# FastAIModel 0.1.1 [ALPHA-2026-06-13] — Native Local Inference Runtime for Java
+# FastAIModel 0.1.2 — Native Local Inference Runtime for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.1-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.1)
+[![Status](https://img.shields.io/badge/status-0.1.2-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
-[![JitPack](https://img.shields.io/badge/JitPack-ready-green.svg)](https://jitpack.io/#andrestubbe)
+[![JitPack](https://img.shields.io/badge/JitPack-0.1.2-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
 
 ---
-**💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Zero-copy, Zero HTTP overhead, C++ native speed.**
+**💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Multi-module architecture for GGUF and ONNX.**
 
-FastAIModel is a **retained-memory local inference engine** for Java that wraps `llama.cpp` (for GGUF) and `ONNX Runtime` (for ONNX) using direct JNI bindings. It is the engine that drives offline execution in the **FastJava Ecosystem**, giving Java developers native LLM and embedding capabilities without keeping heavy external apps (like LM Studio or Ollama) open.
-
-[**Watch the Demo**](https://youtu.be/pY-39438feM)
-
-[![FastAIModel Showcase](docs/screenshot.png)](https://youtu.be/pY-39438feM)
+FastAIModel is a **modular local inference engine** for Java that provides separate lightweight modules for `llama.cpp` (GGUF) and `ONNX Runtime` (ONNX). It allows Java applications to run in-process LLM inference and ONNX embeddings with zero HTTP/network overhead.
 
 ---
 
-## Table of Contents
-- [Why FastAIModel?](#why-fastaimodel)
-- [Key Features](#key-features)
-- [Installation](#installation)
-- [API Reference](#api-reference)
-- [Performance](#performance)
-- [Project Structure](#project-structure)
-- [Roadmap](#roadmap)
-- [License](#license)
+## Modular Architecture (New in 0.1.2)
 
----
+FastAIModel is split into independent modules so you only import what you need:
 
-## Quick Start
-
-```java
-import fastaimodel.FastAIModel;
-
-public class Demo {
-    public static void main(String[] args) {
-        // Load local GGUF model directly into memory
-        try (FastAIModel model = new FastAIModel("models/qwen2.5-coder-1.5b.gguf", 2048, 0.7f)) {
-            model.generate("Write a quicksort in Java:", token -> {
-                System.out.print(token);
-                System.out.flush();
-            });
-        }
-    }
-}
-```
-
----
-
-## Why FastAIModel?
-
-Running LLMs locally in Java typically requires invoking external subprocesses or running local HTTP servers. FastAIModel eliminates this bloat by running the model directly inside your Java process:
-
-- **True In-Process Execution** — Runs the model in the same process space, bypassing system context-switches and network sockets.
-- **Zero HTTP/JSON Overhead** — Text and tokens flow directly between Java and C++ memory.
-- **Low Memory Overhead** — Eliminates the footprint of keeping GUI-based desktop inference servers running in the background.
-
----
-
-## Key Features
-
-- **🚀 Native llama.cpp Performance** — Direct integration with CPU AVX2/AVX512 instruction sets and GPU computation (Vulkan/CUDA).
-- **🌊 Direct Token Streaming** — Direct native callbacks stream tokens back to your Java consumer in real-time.
-- **📦 GGUF Support** — Native compatibility with any GGUF quantized models (Llama, Qwen, Mistral, Gemma).
-- **🧠 Zero-Copy Memory** — Shared token handling minimizing garbage collection strain on the JVM.
+| Module | Description | Dependencies |
+|---|---|---|
+| **`fastaimodel-onnx`** | Ultra-lightweight ONNX Runtime wrapper for embeddings | `onnxruntime` (No C++ Llama DLLs needed) |
+| **`fastaimodel-llama`** | High-performance C++ `llama.cpp` wrapper for GGUF models | `FastCore`, Native C++ DLLs |
 
 ---
 
 ## Installation
 
-### Option 1: Maven (via JitPack)
+### Option 1: ONNX Embeddings Only (`fastaimodel-onnx`)
 
-Add the JitPack repository and the dependencies to your `pom.xml`:
+If you only need ONNX models (e.g. for vector search embeddings):
 
 ```xml
-<repositories>
-    <repository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
-    </repository>
-</repositories>
-
 <dependencies>
-    <!-- FastAIModel Engine -->
     <dependency>
-        <groupId>com.github.andrestubbe</groupId>
-        <artifactId>FastAIModel</artifactId>
-        <version>0.1.1</version>
-    </dependency>
-
-    <!-- FastCore (Mandatory Native DLL Loader) -->
-    <dependency>
-        <groupId>com.github.andrestubbe</groupId>
-        <artifactId>FastCore</artifactId>
-        <version>0.1.1</version>
+        <groupId>com.github.andrestubbe.FastAIModel</groupId>
+        <artifactId>fastaimodel-onnx</artifactId>
+        <version>0.1.2</version>
     </dependency>
 </dependencies>
 ```
 
-### Option 2: Gradle (via JitPack)
+### Option 2: GGUF LLM Local Inference (`fastaimodel-llama`)
 
-```groovy
-repositories {
-    maven { url 'https://jitpack.io' }
+If you want in-process C++ GGUF LLM execution via `llama.cpp`:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.github.andrestubbe.FastAIModel</groupId>
+        <artifactId>fastaimodel-llama</artifactId>
+        <version>0.1.2</version>
+    </dependency>
+</dependencies>
+```
+
+---
+
+## Quick Start
+
+### ONNX Model Usage (`fastaimodel-onnx`)
+
+```java
+import fastaimodel.FastAIOnnxModel;
+
+try (FastAIOnnxModel onnx = new FastAIOnnxModel("models/model.onnx")) {
+    // Run ONNX inference
+    var result = onnx.run(inputs);
 }
+```
 
-dependencies {
-    implementation 'com.github.andrestubbe:FastAIModel:0.1.1'
-    implementation 'com.github.andrestubbe:FastCore:0.1.1'
+### GGUF Model Usage (`fastaimodel-llama`)
+
+```java
+import fastaimodel.FastAIModel;
+
+try (FastAIModel model = new FastAIModel("models/qwen2.5-coder-1.5b.gguf")) {
+    model.predict("Write a quicksort in Java:", 128, token -> {
+        System.out.print(token);
+    });
 }
 ```
 
@@ -116,28 +85,9 @@ dependencies {
 
 ## Documentation
 
-* **[ROADMAP.md](docs/ROADMAP.md)**: Planned milestone features and performance extensions.
-* **[REFERENCE.md](docs/REFERENCE.md)**: JNI contracts and configuration options.
+* **[REFERENCE.md](docs/REFERENCE.md)**: JNI contracts and module specifications.
 * **[PHILOSOPHY.md](docs/PHILOSOPHY.md)**: In-process design decisions.
 * **[CHANGELOG.md](docs/CHANGELOG.md)**: Releases history.
-
----
-
-## Platform Support
-
-| Platform | Status |
-|---|---|
-| Windows 10/11 (x64) | ✅ Fully Supported |
-| Linux | 🚧 Planned |
-| macOS | 🚧 Planned |
-
----
-
-## Related Projects
-
-- [FastAI](https://github.com/andrestubbe/FastAI) - Unified AI client interface for Java
-- [FastAIMemory](https://github.com/andrestubbe/FastAIMemory) - Unified conversation history and prompt formatters
-- [FastCore](https://github.com/andrestubbe/FastCore) - Unified JNI loader and platform abstraction
 
 ---
 

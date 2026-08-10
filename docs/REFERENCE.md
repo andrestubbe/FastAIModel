@@ -1,46 +1,44 @@
 # FastAIModel API Reference
 
-Detailed technical specification and native contracts for `FastAIModel`.
+Detailed technical specification and contracts for `FastAIModel` 0.1.2.
 
 ---
 
-## Classes & API Quick Reference
+## Modules
 
-### `FastAIModel`
+### 1. `fastaimodel-onnx`
 
-Core native model execution class. Implements `AutoCloseable` to safely dispose of native handles and prevent C++ memory leaks.
+Lightweight module for ONNX model execution. Does **not** require or load any C++ Llama DLLs.
 
-#### Constructors
-* `public FastAIModel(String modelPath, int contextSize, float temperature)`
-  * **modelPath**: Path to the local `.gguf` model file.
-  * **contextSize**: Max context token limit (e.g. `2048`, `4096`).
-  * **temperature**: Sampling temperature (e.g. `0.7f`).
+#### Class: `fastaimodel.FastAIOnnxModel`
 
-#### Methods
-* `public void generate(String prompt, Consumer<String> tokenCallback)`
-  * Generates tokens for the given prompt, invoking the callback in real-time as each token is generated.
-* `public void close()`
-  * Disposes of the native C++ model context and frees loaded weights from memory.
-
----
-
-## JNI Architecture
-
-The C++ JNI implementation interfaces with `llama.cpp` using the following signature signatures:
-
-```cpp
-JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeLoadModel
-  (JNIEnv *, jclass, jstring modelPath, jint contextSize, jfloat temperature);
-
-JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativeGenerate
-  (JNIEnv *, jclass, jlong modelHandle, jstring prompt, jobject tokenCallback);
-
-JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativeFreeModel
-  (JNIEnv *, jclass, jlong modelHandle);
+```java
+try (FastAIOnnxModel onnx = new FastAIOnnxModel("models/model.onnx")) {
+    OrtSession.Result result = onnx.run(inputs);
+}
 ```
 
+* `public FastAIOnnxModel(String modelPath)`
+* `public OrtSession getSession()`
+* `public OrtEnvironment getEnv()`
+* `public OrtSession.Result run(Map<String, OnnxTensor> inputs)`
+* `public void close()`
+
 ---
 
-## Native Memory Management
+### 2. `fastaimodel-llama`
 
-Because models are loaded into C++ heap memory (outside of the JVM Garbage Collector), you must always use `try-with-resources` or manually invoke `.close()` to free model weights and release physical RAM.
+In-process C++ inference engine wrapping `llama.cpp` for GGUF models.
+
+#### Class: `fastaimodel.FastAIModel`
+
+```java
+try (FastAIModel model = new FastAIModel("models/qwen.gguf")) {
+    model.predict("Prompt", 128, token -> System.out.print(token));
+}
+```
+
+* `public FastAIModel(String modelPath)`
+* `public FastAIModel(String modelPath, int ctxSize, int gpuLayers)`
+* `public void predict(String prompt, int maxTokens, TokenCallback cb)`
+* `public void close()`
