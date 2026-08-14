@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastAIModel</artifactId>
-        <version>0.1.2</version>
+        <version>0.1.6</version>
     </parent>
 
     <artifactId>fastaimodel-llama</artifactId>
@@ -18,11 +18,17 @@
     <description>Local GGUF / llama.cpp C++ inference runtime engine module for FastAIModel</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.github.andrestubbe</groupId>
+            <artifactId>fastgpu</artifactId>
+            <version>0.1.1</version>
+        </dependency>
+
         <!-- FastCore - Unified JNI loader -->
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>FastCore</artifactId>
-            <version>0.1.0</version>
+            <version>0.1.6</version>
         </dependency>
     </dependencies>
 
