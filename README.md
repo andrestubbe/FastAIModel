@@ -1,10 +1,10 @@
-# FastAIModel 0.1.6 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
+# FastAIModel 0.1.3 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.6-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.6)
+[![Status](https://img.shields.io/badge/status-0.1.3-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.3)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
-[![JitPack](https://img.shields.io/badge/JitPack-0.1.6-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
+[![JitPack](https://img.shields.io/badge/JitPack-0.1.3-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
 
 ---
 
@@ -98,7 +98,7 @@ Add the JitPack repository and dependencies to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-llama</artifactId>
-        <version>0.1.6</version>
+        <version>0.1.3</version>
     </dependency>
 
     <!-- FastGPU Acceleration Substrate -->

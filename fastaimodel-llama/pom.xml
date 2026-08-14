@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastAIModel</artifactId>
-        <version>0.1.6</version>
+        <version>0.1.3</version>
     </parent>
 
     <artifactId>fastaimodel-llama</artifactId>
@@ -21,14 +21,14 @@
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>fastgpu</artifactId>
-            <version>0.1.1</version>
+            <version>0.1.3</version>
         </dependency>
 
         <!-- FastCore - Unified JNI loader -->
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>FastCore</artifactId>
-            <version>0.1.6</version>
+            <version>0.1.3</version>
         </dependency>
     </dependencies>
 
