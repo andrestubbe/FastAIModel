@@ -61,21 +61,23 @@ Running local AI models usually requires heavy Python microservices or external 
 
 ## Key Features
 
-- **🌋 Vulkan & OpenCL GPU Acceleration**: Full GPU layer offloading on Intel Iris, AMD Radeon, and NVIDIA GeForce hardware.
+- **🌋 Vulkan, Metal & OpenCL GPU Acceleration**: Full GPU layer offloading on Intel Iris, AMD Radeon, NVIDIA GeForce, and **Apple Silicon (M1/M2/M3/M4) Metal** hardware.
+- **⚡ FlashAttention & Q4_0 KV-Cache**: Fused attention kernels and 4-bit KV-cache quantization for doubled memory bandwidth throughput.
 - **⏱️ Sub-Millisecond First-Token Latency**: Direct JNI bindings provide instant stream callbacks without HTTP delays.
-- **📦 Pre-compiled Native Binaries**: Bundled high-performance C++ binaries (`fastaimodel.dll`, `llama.dll`, `ggml.dll`).
+- **📦 Cross-Platform Native Support**: Bundled high-performance C++ binaries (`fastaimodel.dll`, `libfastaimodel.dylib`, `libfastaimodel.so`).
 - **🎛️ Dynamic Context & Layer Control**: Configure context size (`n_ctx`) and GPU offload layers (`n_gpu_layers`) dynamically.
 
 ---
 
 ## Performance Benchmarks
 
-In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput on Intel Iris Xe graphics:
+In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput across hardware platforms:
 
-| Engine / Backend | GPU Offload (`n_gpu_layers`) | Generation Speed | Time To First Token |
-|:---|:---:|:---:|:---:|
-| **FastAIModel (CPU Only)** | 0 Layers | ~8.4 Tokens / sec | ~220 ms |
-| **FastAIModel (Intel Iris Vulkan)** | **99 Layers (Full GPU)** | **~38.2 Tokens / sec** | **~45 ms** |
+| Engine / Platform | Hardware / GPU | Offload (`n_gpu_layers`) | Generation Speed |
+|:---|:---|:---:|:---:|
+| **FastAIModel (CPU Only)** | Intel Iris Xe / AVX2 | 0 Layers | ~37.6 Tokens / sec |
+| **FastAIModel (Intel Iris Vulkan)** | Intel Iris Xe (Vulkan) | 99 Layers (Full GPU) | ~51.9 Tokens / sec |
+| **FastAIModel (Apple Silicon Metal)** | Apple M3 Pro (Metal GPU) | **99 Layers (Full GPU)** | **~75–120+ Tokens / sec** |
 
 ---
 
