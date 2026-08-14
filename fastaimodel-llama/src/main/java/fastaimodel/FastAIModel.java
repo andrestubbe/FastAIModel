@@ -4,29 +4,43 @@ import java.io.File;
 
 public class FastAIModel implements AutoCloseable {
 
+    private static boolean isNativeLoaded = false;
+
     static {
         try {
             fastcore.LibraryLoader.load("ggml", FastAIModel.class);
             fastcore.LibraryLoader.load("llama-common", FastAIModel.class);
             fastcore.LibraryLoader.load("llama", FastAIModel.class);
             fastcore.LibraryLoader.load("fastaimodel", FastAIModel.class);
+            isNativeLoaded = true;
         } catch (Throwable e) {
-            // Fallback to local file load for development environment
+            String os = System.getProperty("os.name").toLowerCase();
+            String ext = os.contains("win") ? ".dll" : (os.contains("mac") ? ".dylib" : ".so");
             String libDir = new File("lib").getAbsolutePath() + File.separator;
-            if (new File(libDir + "fastaimodel.dll").exists()) {
-                try { System.load(libDir + "libomp140.x86_64.dll"); } catch (Throwable ignored) {}
-                try { System.load(libDir + "ggml-base.dll"); } catch (Throwable ignored) {}
-                try { System.load(libDir + "ggml.dll"); } catch (Throwable ignored) {}
-                try { System.load(libDir + "ggml-cpu-x64.dll"); } catch (Throwable ignored) {}
-                try { System.load(libDir + "llama.dll"); } catch (Throwable ignored) {}
-                System.load(libDir + "fastaimodel.dll");
-            } else {
-                System.loadLibrary("fastaimodel");
+            
+            if (new File(libDir + "fastaimodel" + ext).exists()) {
+                try { System.load(libDir + "libomp140.x86_64" + ext); } catch (Throwable ignored) {}
+                try { System.load(libDir + "ggml-base" + ext); } catch (Throwable ignored) {}
+                try { System.load(libDir + "ggml" + ext); } catch (Throwable ignored) {}
+                try { System.load(libDir + "ggml-cpu" + ext); } catch (Throwable ignored) {}
+                try { System.load(libDir + "llama" + ext); } catch (Throwable ignored) {}
+                try {
+                    System.load(libDir + "fastaimodel" + ext);
+                    isNativeLoaded = true;
+                } catch (Throwable ignored) {}
+            }
+            if (!isNativeLoaded) {
+                try {
+                    System.loadLibrary("fastaimodel");
+                    isNativeLoaded = true;
+                } catch (Throwable ignored) {}
             }
         }
-        try {
-            nativeSetVerbose(false);
-        } catch (Throwable ignored) {}
+        if (isNativeLoaded) {
+            try {
+                nativeSetVerbose(false);
+            } catch (Throwable ignored) {}
+        }
     }
 
     private long handle;

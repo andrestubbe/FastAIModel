@@ -98,6 +98,8 @@ JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
 
     llama_model_params mparams = llama_model_default_params();
     mparams.n_gpu_layers = gpuLayers;
+    mparams.use_mmap = true;
+    mparams.use_mlock = false;
 
     llama_model* model = llama_load_model_from_file(modelPath, mparams);
 
@@ -111,10 +113,16 @@ JNIEXPORT jlong JNICALL Java_fastaimodel_FastAIModel_nativeInit(
 
     llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx    = ctxSize;
-    cparams.n_batch  = ctxSize;
-    cparams.n_ubatch = ctxSize;
-    cparams.n_threads = (uint32_t)std::thread::hardware_concurrency();
-    cparams.n_threads_batch = (uint32_t)std::thread::hardware_concurrency();
+    cparams.n_batch  = 2048;
+    cparams.n_ubatch = 2048;
+    cparams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    cparams.type_k   = GGML_TYPE_Q4_0;
+    cparams.type_v   = GGML_TYPE_Q4_0;
+    cparams.offload_kqv = true;
+    cparams.op_offload  = true;
+    int threadCount = (int)std::thread::hardware_concurrency();
+    cparams.n_threads = threadCount;
+    cparams.n_threads_batch = threadCount;
 
     llama_context* ctx = llama_new_context_with_model(model, cparams);
     if (!ctx) {
