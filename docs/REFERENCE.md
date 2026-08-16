@@ -21,6 +21,9 @@ Implements `AutoCloseable` for in-process GGUF LLM execution via JNI bindings to
 - `public void predict(String prompt, int maxTokens, TokenCallback cb)`  
   Executes autoregressive LLM inference and streams generated text tokens to the `TokenCallback` interface in real time.
 
+- `public void predictFromMemoryAddress(long memoryAddress, int maxTokens, TokenCallback cb)`  
+  Executes zero-copy autoregressive LLM inference reading prompt UTF-8 bytes directly from a **[FastSharedMemory](https://github.com/andrestubbe/FastSharedMemory)** native memory address, bypassing Java String allocations and reducing IPC transfer latency to < 800 nanoseconds.
+
 - `public void close()`  
   Frees native `llama.cpp` model context, KV cache buffers, and GPU Vulkan/Metal resources.
 
