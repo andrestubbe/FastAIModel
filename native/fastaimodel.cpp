@@ -213,6 +213,72 @@ JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativePredict(
     }
 }
 
+JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativePredictFromMemoryAddress(
+    JNIEnv* env, jclass clazz, jlong handlePtr, jlong memoryAddress, jint maxTokens,
+    jfloat temperature, jfloat topP, jobject callback) {
+
+    auto* handle = reinterpret_cast<FastAIModelHandle*>(handlePtr);
+    if (!handle || memoryAddress == 0 || !callback) return;
+
+    jclass cbClass = env->GetObjectClass(callback);
+    jmethodID onTokenMethod = env->GetMethodID(cbClass, "onToken", "(Ljava/lang/String;)V");
+    if (!onTokenMethod) return;
+
+    const char* prompt = reinterpret_cast<const char*>(memoryAddress);
+
+    // Tokenize directly from shared memory address
+    int32_t n_tokens_max = -llama_tokenize(handle->vocab, prompt, (int32_t)strlen(prompt), nullptr, 0, true, true);
+    std::vector<llama_token> tokens(n_tokens_max);
+    int32_t n_tokens = llama_tokenize(handle->vocab, prompt, (int32_t)strlen(prompt), tokens.data(), tokens.size(), true, true);
+
+    if (n_tokens < 0) return;
+    tokens.resize(n_tokens);
+
+    // Decode prompt in chunks
+    size_t chunk_size = 512;
+    for (size_t i = 0; i < tokens.size(); i += chunk_size) {
+        size_t n_eval = std::min(chunk_size, tokens.size() - i);
+        struct llama_batch batch = llama_batch_get_one(tokens.data() + i, (int32_t)n_eval);
+        if (llama_decode(handle->ctx, batch) != 0) {
+            return;
+        }
+    }
+
+    // Sampler setup
+    struct llama_sampler* smpl = nullptr;
+    if (temperature <= 0.0f) {
+        smpl = llama_sampler_init_greedy();
+    } else {
+        struct llama_sampler* chain = llama_sampler_chain_init(llama_sampler_chain_default_params());
+        llama_sampler_chain_add(chain, llama_sampler_init_top_p(topP, 1));
+        llama_sampler_chain_add(chain, llama_sampler_init_temp(temperature));
+        llama_sampler_chain_add(chain, llama_sampler_init_dist(1234));
+        smpl = chain;
+    }
+
+    // Prediction loop
+    for (int i = 0; i < maxTokens; i++) {
+        llama_token token = llama_sampler_sample(smpl, handle->ctx, -1);
+        if (token == llama_vocab_eos(handle->vocab)) break;
+
+        char buf[256];
+        int32_t len = llama_token_to_piece(handle->vocab, token, buf, sizeof(buf), 0, true);
+        if (len > 0) {
+            std::string piece(buf, len);
+            jstring jPiece = env->NewStringUTF(piece.c_str());
+            env->CallVoidMethod(callback, onTokenMethod, jPiece);
+            env->DeleteLocalRef(jPiece);
+        }
+
+        struct llama_batch next_batch = llama_batch_get_one(&token, 1);
+        if (llama_decode(handle->ctx, next_batch) != 0) break;
+    }
+
+    if (smpl) {
+        llama_sampler_free(smpl);
+    }
+}
+
 JNIEXPORT void JNICALL Java_fastaimodel_FastAIModel_nativeFree(
     JNIEnv* env, jclass clazz, jlong handlePtr) {
 

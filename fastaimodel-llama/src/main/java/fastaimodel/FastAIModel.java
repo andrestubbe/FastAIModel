@@ -68,6 +68,13 @@ public class FastAIModel implements AutoCloseable {
         nativePredict(handle, prompt, maxTokens, 0.7f, 0.9f, cb);
     }
 
+    public void predictFromMemoryAddress(long memoryAddress, int maxTokens, TokenCallback cb) {
+        if (handle == 0) {
+            throw new IllegalStateException("Model is not initialized or has been closed");
+        }
+        nativePredictFromMemoryAddress(handle, memoryAddress, maxTokens, 0.7f, 0.9f, cb);
+    }
+
     @Override
     public void close() {
         if (handle != 0) {
@@ -89,6 +96,15 @@ public class FastAIModel implements AutoCloseable {
     private static native void nativePredict(
             long handle,
             String prompt,
+            int maxTokens,
+            float temperature,
+            float topP,
+            TokenCallback callback
+    );
+
+    private static native void nativePredictFromMemoryAddress(
+            long handle,
+            long memoryAddress,
             int maxTokens,
             float temperature,
             float topP,

@@ -1,1 +1,4 @@
+fastaimodel\benchmark\InteractiveOllamaTest.class
+fastaimodel\benchmark\TestCpuVsGpu.class
+fastaimodel\benchmark\ZeroCopyIpcDemo.class
 fastaimodel\GgufDemo.class
