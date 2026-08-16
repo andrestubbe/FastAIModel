@@ -104,6 +104,20 @@ Add the JitPack repository and dependencies to your `pom.xml`:
         <version>0.1.3</version>
     </dependency>
 
+    <!-- FastSharedMemory (Optional Zero-Copy IPC) -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastSharedMemory</artifactId>
+        <version>0.1.2</version>
+    </dependency>
+
+    <!-- FastPointer (Address Arithmetic) -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastPointer</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+
     <!-- FastGPU Acceleration Substrate -->
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
@@ -119,6 +133,32 @@ Add the JitPack repository and dependencies to your `pom.xml`:
     </dependency>
 </dependencies>
 ```
+
+### Option 2: Gradle (via JitPack)
+
+```groovy
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.3'
+    implementation 'com.github.andrestubbe:FastSharedMemory:0.1.2'
+    implementation 'com.github.andrestubbe:FastPointer:0.1.1'
+    implementation 'com.github.andrestubbe:fastgpu:0.1.1'
+    implementation 'com.github.andrestubbe:FastCore:0.1.0'
+}
+```
+
+### Option 3: Direct Download (No Build Tool)
+
+Download the latest JARs directly to add them to your classpath:
+
+1. 🧠 **[fastaimodel-llama-0.1.3.jar](https://github.com/andrestubbe/FastAIModel/releases/download/v0.1.3/fastaimodel-llama-0.1.3.jar)** (GGUF llama.cpp Engine)
+2. ⚡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Optional Zero-Copy IPC)
+3. 📌 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Native Pointer Arithmetic)
+4. 🌋 **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)
+5. ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native JNI Loader)
 
 ---
 
