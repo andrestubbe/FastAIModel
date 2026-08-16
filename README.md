@@ -1,10 +1,10 @@
-# FastAIModel 0.1.3 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
+# FastAIModel 0.1.4 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.3-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.3)
+[![Status](https://img.shields.io/badge/status-0.1.4-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/v0.1.4)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
-[![JitPack](https://img.shields.io/badge/JitPack-0.1.3-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
+[![JitPack](https://img.shields.io/badge/JitPack-0.1.4-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
 
 ---
 
@@ -101,7 +101,7 @@ Add the JitPack repository and dependencies to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-llama</artifactId>
-        <version>0.1.3</version>
+        <version>0.1.4</version>
     </dependency>
 
     <!-- FastSharedMemory (Optional Zero-Copy IPC) -->
@@ -142,7 +142,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.3'
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.4'
     implementation 'com.github.andrestubbe:FastSharedMemory:0.1.2'
     implementation 'com.github.andrestubbe:FastPointer:0.1.1'
     implementation 'com.github.andrestubbe:fastgpu:0.1.1'
@@ -154,7 +154,7 @@ dependencies {
 
 Download the latest JARs directly to add them to your classpath:
 
-1. 🧠 **[fastaimodel-llama-0.1.3.jar](https://github.com/andrestubbe/FastAIModel/releases/download/v0.1.3/fastaimodel-llama-0.1.3.jar)** (GGUF llama.cpp Engine)
+1. 🧠 **[fastaimodel-llama-0.1.4.jar](https://github.com/andrestubbe/FastAIModel/releases/download/v0.1.4/fastaimodel-llama-0.1.4.jar)** (GGUF llama.cpp Engine)
 2. ⚡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Optional Zero-Copy IPC)
 3. 📌 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Native Pointer Arithmetic)
 4. 🌋 **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)
