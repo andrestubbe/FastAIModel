@@ -1,4 +1,4 @@
-# FastAIModel 0.1.4 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
+﻿# FastAIModel 0.1.4 [ALPHA-2026-08] â€” Native Local Inference Runtime with GPU Acceleration for Java
 
 [![Status](https://img.shields.io/badge/status-0.1.4-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/v0.1.4)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,7 +8,7 @@
 
 ---
 
-**💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Native Vulkan GPU acceleration for Intel Iris, AMD Radeon, and NVIDIA GeForce hardware.**
+**ðŸ’¡ Ultra-fast local LLM and embedding inference directly inside your JVM process â€” Native Vulkan GPU acceleration for Intel Iris, AMD Radeon, and NVIDIA GeForce hardware.**
 
 FastAIModel is a **modular local inference engine** for Java that provides separate lightweight modules for `llama.cpp` (GGUF) and `ONNX Runtime` (ONNX). It allows Java applications to run in-process LLM inference and ONNX embeddings with zero HTTP/network overhead and hardware GPU offloading.
 
@@ -16,7 +16,7 @@ FastAIModel is a **modular local inference engine** for Java that provides separ
 
 ---
 
-## Quick Start — GGUF LLM GPU-Accelerated Inference (`fastaimodel-llama`)
+## Quick Start â€” GGUF LLM GPU-Accelerated Inference (`fastaimodel-llama`)
 
 ```java
 import fastaimodel.FastAIModel;
@@ -53,20 +53,20 @@ public class GgufGpuDemo {
 
 Running local AI models usually requires heavy Python microservices or external HTTP servers (e.g. Ollama, LM Studio), adding multi-hundred-millisecond network latencies. FastAIModel solves this by:
 
-- **In-Process JNI Execution** — Runs GGUF models directly inside your JVM process with zero network IPC overhead.
-- **Intel Iris / Vulkan GPU Offloading** — Offloads transformer layers (`n_gpu_layers`) directly to Intel Iris Xe, AMD Radeon, and NVIDIA GeForce GPUs via **[FastGPU](https://github.com/andrestubbe/FastGPU)**.
-- **Modular Lightweight Architecture** — Separate clean modules for `llama.cpp` (`fastaimodel-llama`) and `ONNX Runtime` (`fastaimodel-onnx`).
+- **In-Process JNI Execution** â€” Runs GGUF models directly inside your JVM process with zero network IPC overhead.
+- **Intel Iris / Vulkan GPU Offloading** â€” Offloads transformer layers (`n_gpu_layers`) directly to Intel Iris Xe, AMD Radeon, and NVIDIA GeForce GPUs via **[FastGPU](https://github.com/andrestubbe/FastGPU)**.
+- **Modular Lightweight Architecture** â€” Separate clean modules for `llama.cpp` (`fastaimodel-llama`) and `ONNX Runtime` (`fastaimodel-onnx`).
 
 ---
 
 ## Key Features
 
-- **🌋 Vulkan, Metal & OpenCL GPU Acceleration**: Full GPU layer offloading on Intel Iris, AMD Radeon, NVIDIA GeForce, and **Apple Silicon (M1/M2/M3/M4) Metal** hardware.
-- **⚡ Zero-Copy Shared Memory IPC Integration**: Direct prompt reading from **[FastSharedMemory](https://github.com/andrestubbe/FastSharedMemory)** native memory addresses (`predictFromMemoryAddress`), cutting prompt transfer latency from 15.0 ms down to 800 nanoseconds (**18,000x faster**).
-- **⚡ FlashAttention & Q4_0 KV-Cache**: Fused attention kernels and 4-bit KV-cache quantization for doubled memory bandwidth throughput.
-- **⏱️ Sub-Millisecond First-Token Latency**: Direct JNI bindings provide instant stream callbacks without HTTP delays.
-- **📦 Cross-Platform Native Support**: Bundled high-performance C++ binaries (`fastaimodel.dll`, `libfastaimodel.dylib`, `libfastaimodel.so`).
-- **🎛️ Dynamic Context & Layer Control**: Configure context size (`n_ctx`) and GPU offload layers (`n_gpu_layers`) dynamically.
+- **ðŸŒ‹ Vulkan, Metal & OpenCL GPU Acceleration**: Full GPU layer offloading on Intel Iris, AMD Radeon, NVIDIA GeForce, and **Apple Silicon (M1/M2/M3/M4) Metal** hardware.
+- **âš¡ Zero-Copy Shared Memory IPC Integration**: Direct prompt reading from **[FastSharedMemory](https://github.com/andrestubbe/FastSharedMemory)** native memory addresses (`predictFromMemoryAddress`), cutting prompt transfer latency from 15.0 ms down to 800 nanoseconds (**18,000x faster**).
+- **âš¡ FlashAttention & Q4_0 KV-Cache**: Fused attention kernels and 4-bit KV-cache quantization for doubled memory bandwidth throughput.
+- **â±ï¸ Sub-Millisecond First-Token Latency**: Direct JNI bindings provide instant stream callbacks without HTTP delays.
+- **ðŸ“¦ Cross-Platform Native Support**: Bundled high-performance C++ binaries (`fastaimodel.dll`, `libfastaimodel.dylib`, `libfastaimodel.so`).
+- **ðŸŽ›ï¸ Dynamic Context & Layer Control**: Configure context size (`n_ctx`) and GPU offload layers (`n_gpu_layers`) dynamically.
 
 ---
 
@@ -76,9 +76,9 @@ In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput 
 
 | Engine / Platform | Hardware / GPU | Transfer Mode | Prompt Overhead / Latency | Generation Speed |
 |:---|:---|:---:|:---:|:---:|
-| **Standard Socket / HTTP REST** | Network Loopback (`127.0.0.1`) | TCP / HTTP IPC | ~15,000,000 ns (15.0 ms) | ~20–30 Tokens / sec |
+| **Standard Socket / HTTP REST** | Network Loopback (`127.0.0.1`) | TCP / HTTP IPC | ~15,000,000 ns (15.0 ms) | ~20â€“30 Tokens / sec |
 | **FastAIModel (Zero-Copy IPC)** | **FastSharedMemory** | **Native Pointer (`0x7FFF...`)** | **800 ns (0.0008 ms)** | **~51.9 Tokens / sec** |
-| **FastAIModel (Apple Silicon Metal)** | Apple M3 Pro (Metal GPU) | Zero-Copy Unified RAM | **< 200 ns (0.0002 ms)** | **~75–120+ Tokens / sec** |
+| **FastAIModel (Apple Silicon Metal)** | Apple M3 Pro (Metal GPU) | Zero-Copy Unified RAM | **< 200 ns (0.0002 ms)** | **~75â€“120+ Tokens / sec** |
 
 ---
 
@@ -154,11 +154,11 @@ dependencies {
 
 Download the latest JARs directly to add them to your classpath:
 
-1. 🧠 **[fastaimodel-llama-0.1.4.jar](https://github.com/andrestubbe/FastAIModel/releases/download/v0.1.4/fastaimodel-llama-0.1.4.jar)** (GGUF llama.cpp Engine)
-2. ⚡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Optional Zero-Copy IPC)
-3. 📌 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Native Pointer Arithmetic)
-4. 🌋 **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)
-5. ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native JNI Loader)
+1. ðŸ§  **[fastaimodel-llama-0.1.4.jar](https://github.com/andrestubbe/FastAIModel/releases/download/v0.1.4/fastaimodel-llama-0.1.4.jar)** (GGUF llama.cpp Engine)
+2. âš¡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Optional Zero-Copy IPC)
+3. ðŸ“Œ **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Native Pointer Arithmetic)
+4. ðŸŒ‹ **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)
+5. âš™ï¸ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native JNI Loader)
 
 ---
 
@@ -170,31 +170,42 @@ Download the latest JARs directly to add them to your classpath:
 * **[COMPILE.md](docs/COMPILE.md)**: Full compilation guide (MSVC C++17 build chain).
 * **[ROADMAP.md](docs/ROADMAP.md)**: Future development goals.
 
+
+---
+
+## Platform Support
+
+| Platform | Status |
+|----------|--------|
+| Windows 10/11 (x64) | ✅ Fully Supported |
+| Linux | 🚧 Planned |
+| macOS | 🚧 Planned |
+
 ---
 
 ## License
 
-MIT License — See [LICENSE](LICENSE) file for details.
+MIT License â€” See [LICENSE](LICENSE) file for details.
 
 ---
 
 ## Related Projects
 
-- [FastAI](https://github.com/andrestubbe/FastAI) — Unified AI client interface for Java
-- [FastAIAgent](https://github.com/andrestubbe/FastAIAgent) — Autonomous agent loop, intent-graphs, and tool execution
-- [FastAIBot](https://github.com/andrestubbe/FastAIBot) — Zero-bloat bot harnesses and persona runtime
-- [FastAIGraph](https://github.com/andrestubbe/FastAIGraph) — In-memory knowledge graph and multi-hop relationship engine
-- [FastAIHybrid](https://github.com/andrestubbe/FastAIHybrid) — Dense-sparse hybrid search fusion (BM25 + Vectors)
-- [FastAIMCP](https://github.com/andrestubbe/FastAIMCP) — Model Context Protocol (MCP) server & tool integration
-- [FastAIMemory](https://github.com/andrestubbe/FastAIMemory) — Conversation history, sliding windows, and rolling summaries
-- [FastAIModel](https://github.com/andrestubbe/FastAIModel) — Native local inference runtime (GGUF/ONNX)
-- [FastAIRag](https://github.com/andrestubbe/FastAIRag) — Ultra-fast document chunking and vector retrieval
-- [FastAIReasoner](https://github.com/andrestubbe/FastAIReasoner) — Deterministic planning, chain-of-thought, and self-correction
-- [FastAIRerank](https://github.com/andrestubbe/FastAIRerank) — Cross-encoder relevance filtering and Top-N prompt pruner
-- [FastAIRuntime](https://github.com/andrestubbe/FastAIRuntime) — Sandboxed process runner and tool-calling execution pipeline
-- [FastAIVectorDB](https://github.com/andrestubbe/FastAIVectorDB) — High-throughput SIMD/AVX2 vector database
-- [FastCore](https://github.com/andrestubbe/FastCore) — Unified JNI loader and platform abstraction
+- [FastAI](https://github.com/andrestubbe/FastAI) â€” Unified AI client interface for Java
+- [FastAIAgent](https://github.com/andrestubbe/FastAIAgent) â€” Autonomous agent loop, intent-graphs, and tool execution
+- [FastAIBot](https://github.com/andrestubbe/FastAIBot) â€” Zero-bloat bot harnesses and persona runtime
+- [FastAIGraph](https://github.com/andrestubbe/FastAIGraph) â€” In-memory knowledge graph and multi-hop relationship engine
+- [FastAIHybrid](https://github.com/andrestubbe/FastAIHybrid) â€” Dense-sparse hybrid search fusion (BM25 + Vectors)
+- [FastAIMCP](https://github.com/andrestubbe/FastAIMCP) â€” Model Context Protocol (MCP) server & tool integration
+- [FastAIMemory](https://github.com/andrestubbe/FastAIMemory) â€” Conversation history, sliding windows, and rolling summaries
+- [FastAIModel](https://github.com/andrestubbe/FastAIModel) â€” Native local inference runtime (GGUF/ONNX)
+- [FastAIRag](https://github.com/andrestubbe/FastAIRag) â€” Ultra-fast document chunking and vector retrieval
+- [FastAIReasoner](https://github.com/andrestubbe/FastAIReasoner) â€” Deterministic planning, chain-of-thought, and self-correction
+- [FastAIRerank](https://github.com/andrestubbe/FastAIRerank) â€” Cross-encoder relevance filtering and Top-N prompt pruner
+- [FastAIRuntime](https://github.com/andrestubbe/FastAIRuntime) â€” Sandboxed process runner and tool-calling execution pipeline
+- [FastAIVectorDB](https://github.com/andrestubbe/FastAIVectorDB) â€” High-throughput SIMD/AVX2 vector database
+- [FastCore](https://github.com/andrestubbe/FastCore) â€” Unified JNI loader and platform abstraction
 
 ---
 
-**Part of the FastJava Ecosystem** — *Making the JVM faster. Small package. Maximum speed. Zero bloat. 🚀📋*
+**Part of the FastJava Ecosystem** â€” *Making the JVM faster. Small package. Maximum speed. Zero bloat. ðŸš€ðŸ“‹*
