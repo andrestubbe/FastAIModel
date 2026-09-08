@@ -12,7 +12,9 @@
 
 FastAIModel is a **modular local inference engine** for Java that provides separate lightweight modules for `llama.cpp` (GGUF) and `ONNX Runtime` (ONNX). It allows Java applications to run in-process LLM inference and ONNX embeddings with zero HTTP/network overhead and hardware GPU offloading.
 
-![Showcase](https://raw.githubusercontent.com/andrestubbe/FastAIModel/main/docs/screenshot.png)
+[Watch Demo (YouTube)] | [Watch JMH Benchmark (Youtube)]
+
+![Showcase](docs/screenshot.png)
 
 ---
 
