@@ -11,8 +11,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [*] Starting StreamingDemo with strict 2 GB memory cap (-Xmx2g)...
-echo.
-java -Xmx2g -cp "fastaimodel-streaming/target/*;examples/StreamingDemo/target/*;examples/StreamingDemo/target/lib/*" fastaimodel.demo.StreamingDemo
+java -Xmx2g -cp "fastaimodel-streaming/target/*;examples/StreamingDemo/target/*;%USERPROFILE%/.m2/repository/com/github/andrestubbe/*/*/*" fastaimodel.demo.StreamingDemo
 
 echo.
 pause
