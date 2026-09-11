@@ -11,7 +11,7 @@
     <packaging>pom</packaging>
 
     <name>FastAIModel</name>
-    <description>Local inference runtime (GGUF/ONNX) engine for Java via llama.cpp and ONNX Runtime</description>
+    <description>Local AI runtime engine for Java: In-process GGUF (llama.cpp), ONNX Runtime, and Zero-Copy Layer-wise Streaming</description>
     <url>https://github.com/andrestubbe/FastAIModel</url>
 
     <modules>

@@ -8,9 +8,12 @@
 
 ---
 
-**💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Native Vulkan GPU acceleration for Intel Iris, AMD Radeon, and NVIDIA GeForce hardware.**
+**💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Native Vulkan GPU acceleration for GGUF, ONNX Runtime, and Zero-Copy Layer-wise Streaming.**
 
-FastAIModel is a **modular local inference engine** for Java that provides separate lightweight modules for `llama.cpp` (GGUF) and `ONNX Runtime` (ONNX). It allows Java applications to run in-process LLM inference and ONNX embeddings with zero HTTP/network overhead and hardware GPU offloading.
+FastAIModel is a **high-performance, modular local AI runtime** for Java that provides three specialized engines:
+1. 🧠 **`fastaimodel-llama`**: In-process GGUF inference via native `llama.cpp` bindings with Vulkan & Apple Metal GPU offloading.
+2. ⚡ **`fastaimodel-onnx`**: Lightweight ONNX Runtime integration for sub-millisecond vector embeddings and deep learning pipelines.
+3. 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise Streaming engine executing 7B–70B parameter models within ultra-low 1 GB – 2 GB RAM budgets.
 
 [Watch Demo (YouTube)] | [Watch JMH Benchmark (Youtube)]
 
