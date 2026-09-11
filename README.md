@@ -1,10 +1,10 @@
-# FastAIModel 0.1.4 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
+# FastAIModel 0.1.7 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.4-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/v0.1.4)
+[![Status](https://img.shields.io/badge/status-0.1.7-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.7)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
-[![JitPack](https://img.shields.io/badge/JitPack-0.1.4-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
+[![JitPack](https://img.shields.io/badge/JitPack-0.1.7-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
 
 ---
 
@@ -31,6 +31,30 @@ public class GgufGpuDemo {
                 System.out.print(token);
                 System.out.flush();
             });
+        }
+    }
+}
+```
+
+### Quick Start — AIR-Style Layer Streaming (`fastaimodel-streaming`)
+
+Execute 7B, 14B, or 70B parameter models under a **strict 1 GB / 2 GB RAM limit** (`-Xmx2g`) using zero-copy Win32 memory-mapped layer streaming and AVX2 / Vulkan offloading:
+
+```java
+import fastaimodel.streaming.FastAIStreamingModel;
+import fastaimodel.streaming.io.ModelResolver;
+import java.io.File;
+
+public class StreamingRunDemo {
+    public static void main(String[] args) {
+        // Auto-detect any local Ollama model (e.g. smollm2:1.7b, mistral:7b, qwen2.5:14b)
+        File modelFile = ModelResolver.findModelBlob("qwen2.5:7b");
+
+        // Initialize streaming engine with a strict 512 MB chunk budget
+        try (FastAIStreamingModel model = new FastAIStreamingModel(modelFile, 512L * 1024 * 1024)) {
+            String prompt = "Explain quantum computing in three sentences:";
+            String output = model.generate(prompt);
+            System.out.println(output);
         }
     }
 }
@@ -105,14 +129,14 @@ Add the JitPack repository and dependencies to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-llama</artifactId>
-        <version>0.1.4</version>
+        <version>0.1.7</version>
     </dependency>
 
     <!-- AIR-Style Chunked Layer-Streaming (Run 20B on 1 GB RAM) -->
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-streaming</artifactId>
-        <version>0.1.4</version>
+        <version>0.1.7</version>
     </dependency>
 
     <!-- FastSharedMemory (Optional Zero-Copy IPC) -->
@@ -153,7 +177,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.4'
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.7'
     implementation 'com.github.andrestubbe:FastSharedMemory:0.1.2'
     implementation 'com.github.andrestubbe:FastPointer:0.1.1'
     implementation 'com.github.andrestubbe:fastgpu:0.1.1'
@@ -165,7 +189,7 @@ dependencies {
 
 Download the latest JARs directly to add them to your classpath:
 
-1. 🧠 **[fastaimodel-llama-0.1.4.jar](https://github.com/andrestubbe/FastAIModel/releases/download/v0.1.4/fastaimodel-llama-0.1.4.jar)** (GGUF llama.cpp Engine)
+1. 🧠 **[fastaimodel-llama-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-llama-0.1.7.jar)** (GGUF llama.cpp Engine)
 2. ⚡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Optional Zero-Copy IPC)
 3. 📌 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Native Pointer Arithmetic)
 4. 🌋 **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)

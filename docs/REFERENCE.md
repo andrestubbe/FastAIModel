@@ -37,3 +37,26 @@ In-process ONNX Runtime embedding engine for vector embeddings.
 
 - `public float[] embed(String text)`  
   Generates high-dimensional vector embeddings for text inputs.
+
+---
+
+## Class: `fastaimodel.streaming.FastAIStreamingModel`
+
+High-throughput AIR-style chunked layer and expert streaming engine implementing `AutoCloseable`. Executes large language models (7B, 14B, 70B, MoE) under strict memory budgets (512 MB – 2 GB) by dynamically streaming layers from disk into recycled off-heap double buffers.
+
+### Constructors
+
+- `public FastAIStreamingModel(File modelFile)`  
+  Initializes streaming pipeline with the default 512 MB chunk budget and dual-slot off-heap buffer ring.
+
+- `public FastAIStreamingModel(File modelFile, long chunkBudgetBytes)`  
+  Initializes streaming pipeline with a custom chunk budget (e.g. `1024L * 1024 * 1024` for 1 GB chunks).
+
+### Key Features & Internal Architecture
+
+- **`DoubleBufferRing`**: Two page-locked (`Memory.lockPages()`), 32-byte SIMD-aligned off-heap slots allocated via `FastMemory` and referenced by 64-bit `FastPointer`.
+- **`NativeChunkMmap`**: Zero-copy Win32 memory-mapped layer slices with explicit cleaner invocations (`sun.misc.Unsafe`) to eliminate Windows file locks.
+- **`ChunkPipelineScheduler`**: Overlaps chunk prefetching and compute using Java 21 Virtual Threads and AVX2 vector memory copies (`FastSIMD.copy()`).
+- **`PersistentKVCache`**: Retains multi-layer attention key/value states permanently in RAM (~100–300 MB) across layer streaming cycles.
+- **`FastGPU` Integration**: Dispatches layer GEMV operations to Vulkan Compute with automatic fallback to `FastSIMD` (AVX2/AVX-512 CPU).
+
