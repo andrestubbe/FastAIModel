@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <name>fastaimodel-streaming</name>
-    <description>AIR-Style Chunked Layer &amp; Expert Streaming Engine for FastAIModel</description>
+    <description>Layer-wise Streaming Chunked Layer &amp; Expert Streaming Engine for FastAIModel</description>
 
     <dependencies>
         <dependency>

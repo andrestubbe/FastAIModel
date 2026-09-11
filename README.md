@@ -36,7 +36,7 @@ public class GgufGpuDemo {
 }
 ```
 
-### Quick Start — AIR-Style Layer Streaming (`fastaimodel-streaming`)
+### Quick Start — Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)
 
 Execute 7B, 14B, or 70B parameter models under a **strict 1 GB / 2 GB RAM limit** (`-Xmx2g`) using zero-copy Win32 memory-mapped layer streaming and AVX2 / Vulkan offloading:
 
@@ -82,7 +82,7 @@ Running local AI models usually requires heavy Python microservices or external 
 
 - **In-Process JNI Execution** — Runs GGUF models directly inside your JVM process with zero network IPC overhead.
 - **Intel Iris / Vulkan GPU Offloading** — Offloads transformer layers (`n_gpu_layers`) directly to Intel Iris Xe, AMD Radeon, and NVIDIA GeForce GPUs via **[FastGPU](https://github.com/andrestubbe/FastGPU)**.
-- **AIR-Style Chunked Layer-Streaming (`fastaimodel-streaming`)** — Stream 20B–70B parameter models under strict 1 GB / 2 GB RAM limits via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
+- **Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)** — Stream 20B–70B parameter models under strict 1 GB / 2 GB RAM limits via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
 - **Modular Lightweight Architecture** — Separate clean modules for `llama.cpp` (`fastaimodel-llama`), `ONNX Runtime` (`fastaimodel-onnx`), and `Layer-Streaming` (`fastaimodel-streaming`).
 
 ---
@@ -132,7 +132,7 @@ Add the JitPack repository and dependencies to your `pom.xml`:
         <version>0.1.7</version>
     </dependency>
 
-    <!-- AIR-Style Chunked Layer-Streaming (Run 20B on 1 GB RAM) -->
+    <!-- Zero-Copy Layer-wise Streaming (Run 20B on 1 GB RAM) -->
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-streaming</artifactId>

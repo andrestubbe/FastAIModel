@@ -10,7 +10,7 @@ import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 
 /**
- * FastAIModel AIR-Style Layer Streaming Live Console Showcase.
+ * FastAIModel Zero-Copy Layer-wise Streaming Live Console Showcase.
  * Automatically resolves local models (e.g. smollm2:1.7b) or falls back to synthetic test fixtures.
  */
 public class StreamingDemo {
@@ -19,7 +19,7 @@ public class StreamingDemo {
         System.setOut(new java.io.PrintStream(System.out, true, StandardCharsets.UTF_8));
 
         System.out.println("================================================================================");
-        System.out.println("   FastAIModel — AIR-Style Layer-Streaming Engine Showcase                      ");
+        System.out.println("   FastAIModel — Zero-Copy Layer-wise Streaming Engine Showcase                      ");
         System.out.println("   Zero-Copy Win32 mmap • Overlapped Virtual Thread IO • Fixed RAM Ring Buffer   ");
         System.out.println("================================================================================\n");
 

@@ -3,7 +3,7 @@
 ## [0.1.7] — 2026-09-11
 
 ### Added
-- **AIR-Style Chunked Layer-Streaming Engine (`fastaimodel-streaming`)**:
+- **Zero-Copy Layer-wise Streaming Engine (`fastaimodel-streaming`)**:
   - Direct execution of 7B, 14B, and 70B parameter models under a strict **1 GB / 2 GB RAM limit** (`-Xmx2g`).
   - Zero-Copy Win32 memory-mapping (`NativeChunkMmap`) with safe explicit `sun.misc.Unsafe` unmapping to prevent Windows file-lock errors.
   - Zero-Copy GGUF v2/v3 metadata & tensor offset indexer (`GgufTensorIndexer`).

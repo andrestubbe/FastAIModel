@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-title FastAIModel - AIR-Style Layer Streaming Demo
+title FastAIModel - Zero-Copy Layer-wise Streaming Demo
 
 echo [*] Building fastaimodel-streaming and StreamingDemo...
 call mvn clean package -pl fastaimodel-streaming,examples/StreamingDemo -DskipTests -q
