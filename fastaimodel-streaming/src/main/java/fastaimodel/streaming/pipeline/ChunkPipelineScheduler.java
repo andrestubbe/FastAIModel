@@ -3,14 +3,15 @@ package fastaimodel.streaming.pipeline;
 import fastaimodel.streaming.buffer.DoubleBufferRing;
 import fastaimodel.streaming.io.GgufTensorIndexer.LayerChunk;
 import fastaimodel.streaming.io.NativeChunkMmap;
+import fastpointer.Pointer;
+import fastsimd.SIMD;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.*;
 
 /**
  * Asynchronous Overlapped I/O and Compute Pipeline Scheduler.
- * Prefetches Chunk N+1 from disk via Virtual Threads while Chunk N is actively evaluated.
+ * Leverages FastSIMD 256-bit AVX2 acceleration and FastPointer addresses.
  */
 public class ChunkPipelineScheduler implements AutoCloseable {
 
@@ -23,7 +24,6 @@ public class ChunkPipelineScheduler implements AutoCloseable {
         this.ring = ring;
         this.mmap = mmap;
         this.chunks = chunks;
-        // Use Java virtual threads or lightweight daemon threads
         this.prefetchExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "FastAI-Streaming-Prefetcher");
             t.setDaemon(true);
@@ -32,7 +32,7 @@ public class ChunkPipelineScheduler implements AutoCloseable {
     }
 
     public interface ChunkComputeCallback {
-        void compute(LayerChunk chunk, ByteBuffer weightsBuffer) throws Exception;
+        void compute(LayerChunk chunk, Pointer weightsPointer) throws Exception;
     }
 
     /**
@@ -41,7 +41,7 @@ public class ChunkPipelineScheduler implements AutoCloseable {
     public void executeTokenStep(ChunkComputeCallback computeCallback) throws Exception {
         if (chunks.isEmpty()) return;
 
-        // 1. Prime the pump: synchronously load Chunk 0 into Slot A
+        // 1. Synchronously prime Chunk 0 into Slot A
         LayerChunk firstChunk = chunks.get(0);
         loadChunkIntoSlot(firstChunk, ring.getActiveComputeSlot());
 
@@ -51,7 +51,7 @@ public class ChunkPipelineScheduler implements AutoCloseable {
             LayerChunk currentChunk = chunks.get(i);
             DoubleBufferRing.MemorySlot computeSlot = ring.getActiveComputeSlot();
 
-            // Asynchronously prefetch Chunk i+1 into prefetch slot
+            // Asynchronously prefetch Chunk i+1 into background prefetch slot
             if (i + 1 < chunks.size()) {
                 LayerChunk nextChunk = chunks.get(i + 1);
                 DoubleBufferRing.MemorySlot prefetchSlot = ring.getPrefetchSlot();
@@ -64,16 +64,16 @@ public class ChunkPipelineScheduler implements AutoCloseable {
                 });
             }
 
-            // Execute compute on currentChunk in parallel with background prefetch
-            computeCallback.compute(currentChunk, computeSlot.getBuffer());
+            // Compute current chunk via FastPointer
+            computeCallback.compute(currentChunk, computeSlot.getPointer());
 
-            // Wait for prefetch to finish before swapping
+            // Await async prefetch completion
             if (prefetchFuture != null) {
                 prefetchFuture.get();
                 prefetchFuture = null;
             }
 
-            // Swap slots: prefetch slot becomes active compute slot for next iteration
+            // Swap slots: prefetch slot becomes active compute slot
             if (i + 1 < chunks.size()) {
                 ring.swapSlots();
             }
@@ -82,19 +82,17 @@ public class ChunkPipelineScheduler implements AutoCloseable {
 
     private void loadChunkIntoSlot(LayerChunk chunk, DoubleBufferRing.MemorySlot slot) throws Exception {
         slot.setState(DoubleBufferRing.SlotState.LOADING);
-        
+
         long startOffset = chunk.tensors().get(0).offset();
         long totalBytes = chunk.totalBytes();
 
-        ByteBuffer slice = mmap.mapChunk(startOffset, totalBytes);
-        ByteBuffer slotBuf = slot.getBuffer();
-        slotBuf.clear();
+        Pointer srcPointer = mmap.mapChunkPointer(startOffset, totalBytes);
+        Pointer dstPointer = slot.getPointer();
 
-        // Direct transfer into slot buffer
-        int toTransfer = (int) Math.min(slotBuf.capacity(), slice.remaining());
-        slice.limit(slice.position() + toTransfer);
-        slotBuf.put(slice);
-        slotBuf.flip();
+        long bytesToCopy = Math.min(slot.getCapacityBytes(), totalBytes);
+
+        // FastSIMD 256-bit AVX2 hardware copy
+        SIMD.copy(srcPointer, dstPointer, (int) bytesToCopy);
 
         slot.setCurrentChunkIndex(chunk.chunkIndex());
         slot.setState(DoubleBufferRing.SlotState.READY);

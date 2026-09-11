@@ -13,7 +13,7 @@ import java.util.function.Consumer;
 
 /**
  * FastAIStreamingModel — AIR-Style Layer & Expert Streaming Runtime.
- * Allows running 20B+ models under a strict 1 GB - 2 GB memory footprint.
+ * Powered by FastMemory, FastPointer and FastSIMD.
  */
 public class FastAIStreamingModel implements AutoCloseable {
 
@@ -52,9 +52,8 @@ public class FastAIStreamingModel implements AutoCloseable {
         // 3. Initialize Zero-Copy mmap
         this.mmap = new NativeChunkMmap(modelFile);
 
-        // 4. Allocate dual-slot fixed off-heap ring buffer
-        int slotSize = (int) Math.min(Integer.MAX_VALUE - 1024, config.getChunkBudgetBytes());
-        this.bufferRing = new DoubleBufferRing(slotSize);
+        // 4. Allocate dual-slot SIMD-aligned FastMemory ring buffer
+        this.bufferRing = new DoubleBufferRing(config.getChunkBudgetBytes());
 
         // 5. Persistent resident KV-cache
         this.kvCache = new PersistentKVCache(config.getContextLength(), 4096, indexer.getLayerCount());
@@ -70,12 +69,9 @@ public class FastAIStreamingModel implements AutoCloseable {
         String[] mockTokens = {"Deep ", "neural ", "networks ", "stream ", "zero-copy ", "directly ", "from ", "SSD."};
 
         for (String token : mockTokens) {
-            // Execute forward step across all layer chunks for this token
-            scheduler.executeTokenStep((chunk, weights) -> {
-                // In production: dispatch weights to SIMD/Vulkan GEMM kernels
-                // Here we verify zero-copy byte availability without memory allocation
-                if (weights.remaining() == 0) {
-                    throw new IllegalStateException("Weights buffer was empty in chunk " + chunk.chunkIndex());
+            scheduler.executeTokenStep((chunk, weightsPointer) -> {
+                if (weightsPointer == null || weightsPointer.isNull()) {
+                    throw new IllegalStateException("Weights pointer was null in chunk " + chunk.chunkIndex());
                 }
             });
 
@@ -92,6 +88,7 @@ public class FastAIStreamingModel implements AutoCloseable {
     @Override
     public void close() throws Exception {
         scheduler.close();
+        bufferRing.close();
         mmap.close();
     }
 }
