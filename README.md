@@ -38,7 +38,7 @@ public class GgufGpuDemo {
 
 ### Quick Start — Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)
 
-Execute 7B, 14B, or 70B parameter models under a **strict 1 GB / 2 GB RAM limit** (`-Xmx2g`) using zero-copy Win32 memory-mapped layer streaming and AVX2 / Vulkan offloading:
+Execute 7B, 14B, or 70B parameter models within an **ultra-low 1 GB – 2 GB RAM budget** (`-Xmx2g`, or any custom limit) using zero-copy Win32 memory-mapped layer streaming and AVX2 / Vulkan offloading:
 
 ```java
 import fastaimodel.streaming.FastAIStreamingModel;
@@ -50,7 +50,7 @@ public class StreamingRunDemo {
         // Auto-detect any local Ollama model (e.g. smollm2:1.7b, mistral:7b, qwen2.5:14b)
         File modelFile = ModelResolver.findModelBlob("qwen2.5:7b");
 
-        // Initialize streaming engine with a strict 512 MB chunk budget
+        // Initialize streaming engine with a configurable 512 MB chunk budget
         try (FastAIStreamingModel model = new FastAIStreamingModel(modelFile, 512L * 1024 * 1024)) {
             String prompt = "Explain quantum computing in three sentences:";
             String output = model.generate(prompt);
@@ -82,7 +82,7 @@ Running local AI models usually requires heavy Python microservices or external 
 
 - **In-Process JNI Execution** — Runs GGUF models directly inside your JVM process with zero network IPC overhead.
 - **Intel Iris / Vulkan GPU Offloading** — Offloads transformer layers (`n_gpu_layers`) directly to Intel Iris Xe, AMD Radeon, and NVIDIA GeForce GPUs via **[FastGPU](https://github.com/andrestubbe/FastGPU)**.
-- **Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)** — Stream 20B–70B parameter models under strict 1 GB / 2 GB RAM limits via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
+- **Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)** — Stream 20B–70B parameter models within an ultra-low 1 GB – 2 GB RAM budget (or any custom limit) via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
 - **Modular Lightweight Architecture** — Separate clean modules for `llama.cpp` (`fastaimodel-llama`), `ONNX Runtime` (`fastaimodel-onnx`), and `Layer-Streaming` (`fastaimodel-streaming`).
 
 ---

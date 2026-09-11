@@ -42,7 +42,7 @@ In-process ONNX Runtime embedding engine for vector embeddings.
 
 ## Class: `fastaimodel.streaming.FastAIStreamingModel`
 
-High-throughput AIR-style chunked layer and expert streaming engine implementing `AutoCloseable`. Executes large language models (7B, 14B, 70B, MoE) under strict memory budgets (512 MB – 2 GB) by dynamically streaming layers from disk into recycled off-heap double buffers.
+High-throughput AIR-style chunked layer and expert streaming engine implementing `AutoCloseable`. Executes large language models (7B, 14B, 70B, MoE) under configurable memory budgets (512 MB – 2 GB) by dynamically streaming layers from disk into recycled off-heap double buffers.
 
 ### Constructors
 

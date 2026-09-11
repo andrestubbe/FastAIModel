@@ -4,7 +4,7 @@
 
 ### Added
 - **Zero-Copy Layer-wise Streaming Engine (`fastaimodel-streaming`)**:
-  - Direct execution of 7B, 14B, and 70B parameter models under a strict **1 GB / 2 GB RAM limit** (`-Xmx2g`).
+  - Direct execution of 7B, 14B, and 70B parameter models within an ultra-low **1 GB – 2 GB RAM budget** (or any custom cap) (`-Xmx2g`).
   - Zero-Copy Win32 memory-mapping (`NativeChunkMmap`) with safe explicit `sun.misc.Unsafe` unmapping to prevent Windows file-lock errors.
   - Zero-Copy GGUF v2/v3 metadata & tensor offset indexer (`GgufTensorIndexer`).
   - Off-heap double-buffering ring (`DoubleBufferRing`) with 32-byte SIMD alignment and physical memory page locking (`Memory.lockPages()` / `VirtualLock`).
