@@ -3,6 +3,7 @@ package fastaimodel.demo;
 import fastaimodel.streaming.FastAIStreamingModel;
 import fastaimodel.streaming.StreamingConfig;
 import fastaimodel.streaming.io.GgufTensorIndexer;
+import fastaimodel.streaming.io.ModelResolver;
 
 import java.io.File;
 import java.io.RandomAccessFile;
@@ -10,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * FastAIModel AIR-Style Layer Streaming Live Console Showcase.
- * Demonstrates streaming multi-gigabyte models through strict 1 GB / 2 GB RAM budgets.
+ * Automatically resolves local models (e.g. smollm2:1.7b) or falls back to synthetic test fixtures.
  */
 public class StreamingDemo {
 
@@ -23,10 +24,20 @@ public class StreamingDemo {
         System.out.println("================================================================================\n");
 
         try {
-            // Locate model or create synthetic 20B multi-layer fixture
-            File modelFile = new File("models/synthetic-20B-model.bin");
-            if (!modelFile.exists()) {
+            // Check for smollm2:1.7b in Ollama or models folder
+            File modelFile = ModelResolver.resolve("smollm2:1.7b");
+            boolean isRealModel = (modelFile != null && modelFile.exists() && modelFile.length() > 100 * 1024 * 1024);
+
+            int chunkBudgetMB = 512; // 512 MB Budget for real 1.7B model -> creates 4 chunks!
+
+            if (isRealModel) {
+                System.out.printf("[+] Detected local model: smollm2:1.7b (%4.2f MB GGUF binary)%n",
+                        modelFile.length() / (1024.0 * 1024.0));
+                System.out.printf("[+] File Path: %s%n%n", modelFile.getAbsolutePath());
+            } else {
+                modelFile = new File("models/synthetic-20B-model.bin");
                 modelFile.getParentFile().mkdirs();
+                chunkBudgetMB = 32;
                 System.out.println("[+] Synthesizing 20B Model Weight Container (128 MB fixture with 32 layers)...");
                 try (RandomAccessFile raf = new RandomAccessFile(modelFile, "rw")) {
                     raf.setLength(128L * 1024 * 1024);
@@ -39,21 +50,22 @@ public class StreamingDemo {
                 System.out.println("[+] Synthetic fixture created successfully.\n");
             }
 
-            // Budget: 32 MB chunks (representing 1B / 1GB chunks on full models)
-            int chunkBudgetMB = 32;
-            System.out.printf("[*] Initializing Streaming Pipeline (Chunk Budget: %d MB)...%n", chunkBudgetMB);
+            System.out.printf("[*] Initializing Streaming Pipeline (Chunk Budget: %d MB | FastGPU + FastSIMD)...%n", chunkBudgetMB);
 
             StreamingConfig config = StreamingConfig.builder()
                     .chunkBudgetMB(chunkBudgetMB)
                     .overlapIO(true)
+                    .useGPU(true)
                     .contextLength(2048)
                     .build();
 
             long t0 = System.nanoTime();
             try (FastAIStreamingModel model = new FastAIStreamingModel(modelFile, config)) {
                 long loadTimeMs = (System.nanoTime() - t0) / 1_000_000;
-                System.out.printf("[+] Indexing complete in %d ms! Total Model Layers: %d, Partitioned Chunks: %d%n%n",
+                System.out.printf("[+] Indexing complete in %d ms! Total Model Layers: %d, Partitioned Chunks: %d%n",
                         loadTimeMs, model.getIndexer().getLayerCount(), model.getChunkCount());
+                System.out.printf("[+] Acceleration Backend: %s%n%n",
+                        model.isGpuActive() ? "FastGPU (Vulkan)" : "FastSIMD (AVX2/AVX-512 CPU)");
 
                 System.out.println("--------------------------------------------------------------------------------");
                 System.out.println(" Chunk Partition Table (Fixed Off-Heap Double-Buffer Slots):");
