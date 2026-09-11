@@ -8,12 +8,12 @@
 
 ---
 
-**💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Native Vulkan GPU acceleration for GGUF, ONNX Runtime, and Zero-Copy Layer-wise Streaming.**
+**💡 Ultra-fast local LLM and embedding inference directly inside your JVM process — Native Vulkan GPU acceleration for GGUF, ONNX Runtime, and Zero-Copy Layer-wise & MoE Streaming.**
 
 FastAIModel is a **high-performance, modular local AI runtime** for Java that provides three specialized engines:
 1. 🧠 **`fastaimodel-llama`**: In-process GGUF inference via native `llama.cpp` bindings with Vulkan & Apple Metal GPU offloading.
 2. ⚡ **`fastaimodel-onnx`**: Lightweight ONNX Runtime integration for sub-millisecond vector embeddings and deep learning pipelines.
-3. 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise Streaming engine executing 7B–70B parameter models within ultra-low 1 GB – 2 GB RAM budgets.
+3. 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise & MoE (Mixture of Experts) Streaming engine executing 7B–70B Dense and MoE models (e.g. Mixtral 8x7B) within ultra-low 1 GB – 2 GB RAM budgets.
 
 [Watch Demo (YouTube)] | [Watch JMH Benchmark (Youtube)]
 
@@ -63,9 +63,9 @@ public class OnnxQuickStart {
 }
 ```
 
-### 3. Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)
+### 3. Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`)
 
-Execute 7B, 14B, or 70B parameter models within an **ultra-low 1 GB – 2 GB RAM budget** (`-Xmx2g`, or any custom limit) using zero-copy Win32 memory-mapped layer streaming and AVX2 / Vulkan offloading:
+Execute 7B, 14B, 70B Dense models or **MoE architectures (e.g. Mixtral 8x7B)** within an **ultra-low 1 GB – 2 GB RAM budget** (`-Xmx2g`, or any custom limit) using zero-copy Win32 memory-mapped layer and expert streaming:
 
 ```java
 import fastaimodel.streaming.FastAIStreamingModel;
@@ -109,13 +109,14 @@ Running local AI models usually requires heavy Python microservices or external 
 
 - **In-Process JNI Execution** — Runs GGUF models directly inside your JVM process with zero network IPC overhead.
 - **Intel Iris / Vulkan GPU Offloading** — Offloads transformer layers (`n_gpu_layers`) directly to Intel Iris Xe, AMD Radeon, and NVIDIA GeForce GPUs via **[FastGPU](https://github.com/andrestubbe/FastGPU)**.
-- **Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)** — Stream 20B–70B parameter models within an ultra-low 1 GB – 2 GB RAM budget (or any custom limit) via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
+- **Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`)** — Stream 7B–70B Dense models and multi-gigabyte **MoE architectures (e.g. Mixtral 8x7B, DeepSeek-MoE)** within an ultra-low 1 GB – 2 GB RAM budget (or any custom limit) via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
 - **Modular Lightweight Architecture** — Separate clean modules for `llama.cpp` (`fastaimodel-llama`), `ONNX Runtime` (`fastaimodel-onnx`), and `Layer-Streaming` (`fastaimodel-streaming`).
 
 ---
 
 ## Key Features
 
+- **🌊 Zero-Copy Layer-wise & MoE Expert Streaming**: Stream 20B–70B parameters directly from NVMe SSDs into recycled off-heap double-buffers without OOM crashes.
 - **🌋 Vulkan, Metal & OpenCL GPU Acceleration**: Full GPU layer offloading on Intel Iris, AMD Radeon, NVIDIA GeForce, and **Apple Silicon (M1/M2/M3/M4) Metal** hardware.
 - **⚡ Zero-Copy Shared Memory IPC Integration**: Direct prompt reading from **[FastSharedMemory](https://github.com/andrestubbe/FastSharedMemory)** native memory addresses (`predictFromMemoryAddress`), cutting prompt transfer latency from 15.0 ms down to 800 nanoseconds (**18,000x faster**).
 - **⚡ FlashAttention & Q4_0 KV-Cache**: Fused attention kernels and 4-bit KV-cache quantization for doubled memory bandwidth throughput.
