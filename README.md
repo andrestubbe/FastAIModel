@@ -21,12 +21,16 @@ FastAIModel is a **high-performance, modular local AI runtime** for Java that pr
 
 ---
 
-## Quick Start — GGUF LLM GPU-Accelerated Inference (`fastaimodel-llama`)
+## Quick Start
+
+### 1. GGUF GPU-Accelerated LLM Inference (`fastaimodel-llama`)
+
+In-process execution of local GGUF models via native `llama.cpp` JNI bindings with hardware GPU layer offloading (Intel Iris Xe, AMD Radeon, NVIDIA GeForce, Apple Silicon Metal):
 
 ```java
 import fastaimodel.FastAIModel;
 
-public class GgufGpuDemo {
+public class GgufDemo {
     public static void main(String[] args) {
         // Load local GGUF model with Intel Iris / Vulkan GPU offloading (99 GPU layers)
         try (FastAIModel model = new FastAIModel("models/qwen2.5-coder-1.5b.gguf", 2048, 99)) {
@@ -39,7 +43,27 @@ public class GgufGpuDemo {
 }
 ```
 
-### Quick Start — Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)
+### 2. Lightweight In-Process ONNX Inference (`fastaimodel-onnx`)
+
+Embeddings, text-to-speech, and vision model inference via in-process ONNX Runtime (zero C++ llama DLL dependencies):
+
+```java
+import fastaimodel.FastAIOnnxModel;
+import ai.onnxruntime.OrtSession;
+
+public class OnnxQuickStart {
+    public static void main(String[] args) {
+        // Load local ONNX model (e.g. bge-micro-v2 embeddings, piper TTS, or vision models)
+        try (FastAIOnnxModel onnx = new FastAIOnnxModel("models/bge-micro-v2.onnx")) {
+            OrtSession session = onnx.getSession();
+            System.out.println("ONNX Input Nodes:  " + session.getInputNames());
+            System.out.println("ONNX Output Nodes: " + session.getOutputNames());
+        }
+    }
+}
+```
+
+### 3. Zero-Copy Layer-wise Streaming (`fastaimodel-streaming`)
 
 Execute 7B, 14B, or 70B parameter models within an **ultra-low 1 GB – 2 GB RAM budget** (`-Xmx2g`, or any custom limit) using zero-copy Win32 memory-mapped layer streaming and AVX2 / Vulkan offloading:
 
@@ -48,7 +72,7 @@ import fastaimodel.streaming.FastAIStreamingModel;
 import fastaimodel.streaming.io.ModelResolver;
 import java.io.File;
 
-public class StreamingRunDemo {
+public class StreamingQuickStart {
     public static void main(String[] args) {
         // Auto-detect any local Ollama model (e.g. smollm2:1.7b, mistral:7b, qwen2.5:14b)
         File modelFile = ModelResolver.findModelBlob("qwen2.5:7b");
