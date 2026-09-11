@@ -15,10 +15,9 @@ FastAIModel is a **high-performance, modular local AI runtime** for Java that pr
 2. ⚡ **`fastaimodel-onnx`**: Lightweight ONNX Runtime integration for sub-millisecond vector embeddings and deep learning pipelines.
 3. 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise & MoE (Mixture of Experts) Streaming engine executing 7B–70B Dense and MoE models (e.g. Mixtral 8x7B) within ultra-low 1 GB – 2 GB RAM budgets.
 
-[![Watch Demo on YouTube](https://img.shields.io/badge/YouTube-Watch%20Demo%20Video-red.svg?logo=youtube&style=for-the-badge)](https://www.youtube.com/watch?v=pY-39438feM)
+[**Watch Demo (YouTube)**](https://www.youtube.com/watch?v=pY-39438feM) | [**Watch the JMH Benchmark**](https://www.youtube.com/watch?v=pY-39438feM)
 
-[![FastAIModel Showcase Video](docs/screenshot.png)](https://www.youtube.com/watch?v=pY-39438feM)
-*▶️ Click the screenshot above to watch the live inference demo on YouTube.*
+[![FastAIModel Showcase](docs/screenshot.png)](https://www.youtube.com/watch?v=pY-39438feM)
 
 ---
 
