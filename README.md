@@ -139,9 +139,16 @@ In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput 
 
 ## Installation
 
+Choose the module tailored to your workload:
+* 🧠 **`fastaimodel-llama`**: In-process GGUF inference via `llama.cpp` + Vulkan GPU offloading.
+* ⚡ **`fastaimodel-onnx`**: Lightweight in-process ONNX Runtime (embeddings, TTS, vision).
+* 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise Streaming for 7B–70B models under ultra-low RAM budgets.
+
+---
+
 ### Option 1: Maven (Recommended)
 
-Add the JitPack repository and dependencies to your `pom.xml`:
+Add the JitPack repository and the desired engine module(s) to your `pom.xml`:
 
 ```xml
 <repositories>
@@ -152,42 +159,53 @@ Add the JitPack repository and dependencies to your `pom.xml`:
 </repositories>
 
 <dependencies>
-    <!-- GGUF llama.cpp Engine with Vulkan GPU Support -->
+    <!-- 1. GGUF llama.cpp Engine with Vulkan GPU Support -->
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-llama</artifactId>
         <version>0.1.7</version>
     </dependency>
 
-    <!-- Zero-Copy Layer-wise Streaming (Run 20B on 1 GB RAM) -->
+    <!-- 2. Lightweight ONNX Runtime Engine (Zero C++ DLL dependencies) -->
+    <dependency>
+        <groupId>com.github.andrestubbe.FastAIModel</groupId>
+        <artifactId>fastaimodel-onnx</artifactId>
+        <version>0.1.7</version>
+    </dependency>
+
+    <!-- 3. Zero-Copy Layer-wise Streaming (Run 7B–70B under 1 GB – 2 GB RAM) -->
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-streaming</artifactId>
         <version>0.1.7</version>
     </dependency>
 
-    <!-- FastSharedMemory (Optional Zero-Copy IPC) -->
-    <dependency>
-        <groupId>com.github.andrestubbe</groupId>
-        <artifactId>FastSharedMemory</artifactId>
-        <version>0.1.2</version>
-    </dependency>
-
-    <!-- FastPointer (Address Arithmetic) -->
-    <dependency>
-        <groupId>com.github.andrestubbe</groupId>
-        <artifactId>FastPointer</artifactId>
-        <version>0.1.1</version>
-    </dependency>
-
-    <!-- FastGPU Acceleration Substrate -->
+    <!-- FastJava Native Acceleration Substrates -->
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>fastgpu</artifactId>
         <version>0.1.1</version>
     </dependency>
-
-    <!-- FastCore JNI Loader -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastSIMD</artifactId>
+        <version>0.1.3</version>
+    </dependency>
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastMemory</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastPointer</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastSharedMemory</artifactId>
+        <version>0.1.2</version>
+    </dependency>
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastCore</artifactId>
@@ -204,23 +222,32 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.7'
-    implementation 'com.github.andrestubbe:FastSharedMemory:0.1.2'
-    implementation 'com.github.andrestubbe:FastPointer:0.1.1'
+    // Pick the module(s) you need:
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.7'       // GGUF Engine
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-onnx:0.1.7'        // ONNX Engine
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-streaming:0.1.7'   // Layer-wise Streaming
+
+    // FastJava Ecosystem Libraries
     implementation 'com.github.andrestubbe:fastgpu:0.1.1'
+    implementation 'com.github.andrestubbe:FastSIMD:0.1.3'
+    implementation 'com.github.andrestubbe:FastMemory:0.1.1'
+    implementation 'com.github.andrestubbe:FastPointer:0.1.1'
+    implementation 'com.github.andrestubbe:FastSharedMemory:0.1.2'
     implementation 'com.github.andrestubbe:FastCore:0.1.0'
 }
 ```
 
 ### Option 3: Direct Download (No Build Tool)
 
-Download the latest JARs directly to add them to your classpath:
+Download pre-compiled release JARs directly from [GitHub Releases](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.7):
 
-1. 🧠 **[fastaimodel-llama-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-llama-0.1.7.jar)** (GGUF llama.cpp Engine)
-2. ⚡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Optional Zero-Copy IPC)
-3. 📌 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Native Pointer Arithmetic)
-4. 🌋 **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)
-5. ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native JNI Loader)
+* 🧠 **[fastaimodel-llama-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-llama-0.1.7.jar)** (GGUF llama.cpp Engine with bundled native DLLs)
+* ⚡ **[fastaimodel-onnx-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-onnx-0.1.7.jar)** (Lightweight ONNX Runtime Engine)
+* 🌊 **[fastaimodel-streaming-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-streaming-0.1.7.jar)** (Zero-Copy Layer-wise Streaming Engine)
+* 🌋 **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)
+* ⚡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Zero-Copy Native IPC)
+* 📌 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (64-Bit Native Pointer Arithmetic)
+* ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Cross-Platform JNI Loader)
 
 ---
 
