@@ -17,6 +17,8 @@
     <modules>
         <module>fastaimodel-onnx</module>
         <module>fastaimodel-llama</module>
+        <module>fastaimodel-streaming</module>
+        <module>examples/StreamingDemo</module>
     </modules>
 
     <properties>

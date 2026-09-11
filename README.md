@@ -58,7 +58,8 @@ Running local AI models usually requires heavy Python microservices or external 
 
 - **In-Process JNI Execution** — Runs GGUF models directly inside your JVM process with zero network IPC overhead.
 - **Intel Iris / Vulkan GPU Offloading** — Offloads transformer layers (`n_gpu_layers`) directly to Intel Iris Xe, AMD Radeon, and NVIDIA GeForce GPUs via **[FastGPU](https://github.com/andrestubbe/FastGPU)**.
-- **Modular Lightweight Architecture** — Separate clean modules for `llama.cpp` (`fastaimodel-llama`) and `ONNX Runtime` (`fastaimodel-onnx`).
+- **AIR-Style Chunked Layer-Streaming (`fastaimodel-streaming`)** — Stream 20B–70B parameter models under strict 1 GB / 2 GB RAM limits via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
+- **Modular Lightweight Architecture** — Separate clean modules for `llama.cpp` (`fastaimodel-llama`), `ONNX Runtime` (`fastaimodel-onnx`), and `Layer-Streaming` (`fastaimodel-streaming`).
 
 ---
 
@@ -104,6 +105,13 @@ Add the JitPack repository and dependencies to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-llama</artifactId>
+        <version>0.1.4</version>
+    </dependency>
+
+    <!-- AIR-Style Chunked Layer-Streaming (Run 20B on 1 GB RAM) -->
+    <dependency>
+        <groupId>com.github.andrestubbe.FastAIModel</groupId>
+        <artifactId>fastaimodel-streaming</artifactId>
         <version>0.1.4</version>
     </dependency>
 
