@@ -24,15 +24,57 @@ public class StreamingDemo {
         System.out.println("================================================================================\n");
 
         try {
-            // Check for smollm2:1.7b in Ollama or models folder
-            File modelFile = ModelResolver.resolve("smollm2:1.7b");
-            boolean isRealModel = (modelFile != null && modelFile.exists() && modelFile.length() > 100 * 1024 * 1024);
+            java.util.List<String> installed = ModelResolver.listInstalledModels();
 
-            int chunkBudgetMB = 512; // 512 MB Budget for real 1.7B model -> creates 4 chunks!
+            String requestedModel = (args.length > 0 && !args[0].trim().isEmpty()) ? args[0].trim() : null;
+            int chunkBudgetMB = 512;
+            if (args.length > 1) {
+                try {
+                    chunkBudgetMB = Integer.parseInt(args[1].trim());
+                } catch (NumberFormatException ignored) {}
+            }
+
+            boolean useGpu = true;
+            boolean overlapIO = true;
+            String userPrompt = "Explain how layer-streaming circumvents VRAM limits in Java";
+
+            for (int i = 2; i < args.length; i++) {
+                String arg = args[i].trim();
+                if (arg.equalsIgnoreCase("--cpu") || arg.equalsIgnoreCase("-cpu")) {
+                    useGpu = false;
+                } else if (arg.equalsIgnoreCase("--no-overlap")) {
+                    overlapIO = false;
+                } else if (!arg.startsWith("-")) {
+                    userPrompt = arg;
+                }
+            }
+
+            File modelFile = null;
+            String modelDisplayName = "";
+
+            if (requestedModel != null) {
+                modelFile = ModelResolver.resolve(requestedModel);
+                modelDisplayName = requestedModel;
+            } else if (!installed.isEmpty()) {
+                // If not specified via CLI, pick first installed or mistral/qwen if available
+                modelDisplayName = installed.contains("mistral:7b") ? "mistral:7b" : installed.get(0);
+                modelFile = ModelResolver.resolve(modelDisplayName);
+            }
+
+            boolean isRealModel = (modelFile != null && modelFile.exists() && modelFile.length() > 10 * 1024 * 1024);
+
+            if (!installed.isEmpty()) {
+                System.out.println("[*] Installed Local Ollama Models:");
+                for (String m : installed) {
+                    boolean isSelected = m.equalsIgnoreCase(modelDisplayName);
+                    System.out.printf("    %s %s%n", isSelected ? "▶" : "•", m);
+                }
+                System.out.println();
+            }
 
             if (isRealModel) {
-                System.out.printf("[+] Detected local model: smollm2:1.7b (%4.2f MB GGUF binary)%n",
-                        modelFile.length() / (1024.0 * 1024.0));
+                System.out.printf("[+] Selected Model: %s (%4.2f MB GGUF binary)%n",
+                        modelDisplayName, modelFile.length() / (1024.0 * 1024.0));
                 System.out.printf("[+] File Path: %s%n%n", modelFile.getAbsolutePath());
             } else {
                 modelFile = new File("models/synthetic-20B-model.bin");
@@ -50,12 +92,13 @@ public class StreamingDemo {
                 System.out.println("[+] Synthetic fixture created successfully.\n");
             }
 
-            System.out.printf("[*] Initializing Streaming Pipeline (Chunk Budget: %d MB | FastGPU + FastSIMD)...%n", chunkBudgetMB);
+            System.out.printf("[*] Initializing Streaming Pipeline (Chunk Budget: %d MB | %s)...%n",
+                    chunkBudgetMB, useGpu ? "FastGPU + FastSIMD" : "FastSIMD (CPU only)");
 
             StreamingConfig config = StreamingConfig.builder()
                     .chunkBudgetMB(chunkBudgetMB)
-                    .overlapIO(true)
-                    .useGPU(true)
+                    .overlapIO(overlapIO)
+                    .useGPU(useGpu)
                     .contextLength(2048)
                     .build();
 
@@ -77,17 +120,18 @@ public class StreamingDemo {
                 }
                 System.out.println("--------------------------------------------------------------------------------\n");
 
-                System.out.println("[>] Prompt: \"Explain how layer-streaming circumvents VRAM limits in Java\"");
+                System.out.printf("[>] Prompt: \"%s\"%n", userPrompt);
                 System.out.print("[<] Response: ");
 
                 long streamStart = System.nanoTime();
-                model.stream("Prompt", token -> {
+                model.stream(userPrompt, token -> {
                     System.out.print(token);
                     try { Thread.sleep(60); } catch (InterruptedException ignored) {}
                 });
                 long streamElapsedMs = (System.nanoTime() - streamStart) / 1_000_000;
 
-                System.out.printf("%n%n[✓] Inference complete in %d ms (Overlapped I/O active).%n", streamElapsedMs);
+                System.out.printf("%n%n[✓] Inference complete in %d ms (%s).%n",
+                        streamElapsedMs, overlapIO ? "Overlapped I/O active" : "Sequential I/O");
                 System.out.printf("[✓] Peak off-heap weight footprint strictly maintained at: %d MB%n", chunkBudgetMB * 2);
                 System.out.println("================================================================================");
             }
