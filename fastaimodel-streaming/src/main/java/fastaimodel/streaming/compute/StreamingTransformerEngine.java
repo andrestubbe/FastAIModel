@@ -366,10 +366,13 @@ public class StreamingTransformerEngine implements AutoCloseable {
                 float cos = (float) Math.cos(theta);
                 float sin = (float) Math.sin(theta);
 
-                float v0 = vec[offset + i];
-                float v1 = vec[offset + i + headSize / 2];
-                vec[offset + i] = v0 * cos - v1 * sin;
-                vec[offset + i + headSize / 2] = v0 * sin + v1 * cos;
+                // GGML_ROPE_TYPE_NORMAL: consecutive pairs (2*i, 2*i + 1)
+                int i0 = offset + 2 * i;
+                int i1 = offset + 2 * i + 1;
+                float v0 = vec[i0];
+                float v1 = vec[i1];
+                vec[i0] = v0 * cos - v1 * sin;
+                vec[i1] = v0 * sin + v1 * cos;
             }
         }
     }

@@ -168,6 +168,8 @@ public class GgufTokenizer {
             String piece = vocab.get(tokenId);
             // Replace SentencePiece marker \u2581 with space
             piece = piece.replace("▁", " ");
+            // Replace GPT-2 / Byte-level BPE marker \u0120 ('Ġ') with space
+            piece = piece.replace("\u0120", " ");
             // Handle byte tokens like <0x0A> -> \n
             if (piece.startsWith("<0x") && piece.endsWith(">") && piece.length() == 6) {
                 try {
