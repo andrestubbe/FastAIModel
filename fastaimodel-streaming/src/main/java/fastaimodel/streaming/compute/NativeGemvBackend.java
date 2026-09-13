@@ -1,23 +1,28 @@
 package fastaimodel.streaming.compute;
 
+import fastcore.FastCore;
 import fastpointer.Pointer;
 
-import java.io.File;
-import java.io.InputStream;
-import java.lang.foreign.*;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * High-performance Foreign Function & Memory (FFM) backend for native AVX2/FMA matrix multiplications.
- * Dispatches directly to fastai_streaming_kernels.dll without JNI overhead.
+ * <h1>NativeGemvBackend — AVX2/FMA Native Tensor Acceleration</h1>
+ *
+ * <p>Dispatches quantized GEMV and GEMM kernels directly to {@code fastai_streaming_kernels.dll}
+ * via {@link FastCore#lookupFunction} without JNI overhead (~2–5 ns direct downcalls).</p>
+ *
+ * @author Andre Stubbe
+ * @version 0.1.7
+ * @since 0.1.7
  */
 public final class NativeGemvBackend {
 
+    private static final String LIB_NAME = "fastai_streaming_kernels";
     private static final boolean AVAILABLE;
+
     private static MethodHandle MH_GEMV_Q4_0;
     private static MethodHandle MH_GEMV_Q8_0;
     private static MethodHandle MH_GEMM_Q4_0;
@@ -26,91 +31,47 @@ public final class NativeGemvBackend {
     static {
         boolean loaded = false;
         try {
-            Linker linker = Linker.nativeLinker();
-            Path dllPath = resolveAndExtractDll();
-            if (dllPath != null && Files.exists(dllPath)) {
-                Arena arena = Arena.ofAuto();
-                SymbolLookup lookup = SymbolLookup.libraryLookup(dllPath, arena);
+            // void gemv_q4_0_avx2(int outRows, int inCols, const void* weights, const float* vecIn, float* vecOut, int rowBytes)
+            FunctionDescriptor descGemv = FunctionDescriptor.ofVoid(
+                    ValueLayout.JAVA_INT,      // outRows
+                    ValueLayout.JAVA_INT,      // inCols
+                    ValueLayout.ADDRESS,       // weights pointer
+                    ValueLayout.ADDRESS,       // vecIn
+                    ValueLayout.ADDRESS,       // vecOut
+                    ValueLayout.JAVA_INT       // rowBytes
+            );
 
-                // void gemv_q4_0_avx2(int outRows, int inCols, const void* weights, const float* vecIn, float* vecOut, int rowBytes)
-                FunctionDescriptor descGemv = FunctionDescriptor.ofVoid(
-                        ValueLayout.JAVA_INT,      // outRows
-                        ValueLayout.JAVA_INT,      // inCols
-                        ValueLayout.ADDRESS,       // weights pointer
-                        ValueLayout.ADDRESS,       // vecIn
-                        ValueLayout.ADDRESS,       // vecOut
-                        ValueLayout.JAVA_INT       // rowBytes
-                );
+            // void gemm_q4_0_avx2(int outRows, int inCols, const void* weights, const float* inBatchFlat, float* outBatchFlat, int batchSize, int rowBytes)
+            FunctionDescriptor descGemm = FunctionDescriptor.ofVoid(
+                    ValueLayout.JAVA_INT,      // outRows
+                    ValueLayout.JAVA_INT,      // inCols
+                    ValueLayout.ADDRESS,       // weights pointer
+                    ValueLayout.ADDRESS,       // inBatchFlat
+                    ValueLayout.ADDRESS,       // outBatchFlat
+                    ValueLayout.JAVA_INT,      // batchSize
+                    ValueLayout.JAVA_INT       // rowBytes
+            );
 
-                // void gemm_q4_0_avx2(int outRows, int inCols, const void* weights, const float* inBatchFlat, float* outBatchFlat, int batchSize, int rowBytes)
-                FunctionDescriptor descGemm = FunctionDescriptor.ofVoid(
-                        ValueLayout.JAVA_INT,      // outRows
-                        ValueLayout.JAVA_INT,      // inCols
-                        ValueLayout.ADDRESS,       // weights pointer
-                        ValueLayout.ADDRESS,       // inBatchFlat
-                        ValueLayout.ADDRESS,       // outBatchFlat
-                        ValueLayout.JAVA_INT,      // batchSize
-                        ValueLayout.JAVA_INT       // rowBytes
-                );
+            MH_GEMV_Q4_0 = FastCore.lookupFunction(LIB_NAME, "gemv_q4_0_avx2", descGemv, NativeGemvBackend.class);
+            MH_GEMV_Q8_0 = FastCore.lookupFunction(LIB_NAME, "gemv_q8_0_avx2", descGemv, NativeGemvBackend.class);
+            MH_GEMM_Q4_0 = FastCore.lookupFunction(LIB_NAME, "gemm_q4_0_avx2", descGemm, NativeGemvBackend.class);
+            MH_GEMM_Q8_0 = FastCore.lookupFunction(LIB_NAME, "gemm_q8_0_avx2", descGemm, NativeGemvBackend.class);
 
-                var symQ4 = lookup.find("gemv_q4_0_avx2");
-                var symQ8 = lookup.find("gemv_q8_0_avx2");
-                var symGemmQ4 = lookup.find("gemm_q4_0_avx2");
-                var symGemmQ8 = lookup.find("gemm_q8_0_avx2");
-
-                if (symQ4.isPresent() && symQ8.isPresent() && symGemmQ4.isPresent() && symGemmQ8.isPresent()) {
-                    MH_GEMV_Q4_0 = linker.downcallHandle(symQ4.get(), descGemv);
-                    MH_GEMV_Q8_0 = linker.downcallHandle(symQ8.get(), descGemv);
-                    MH_GEMM_Q4_0 = linker.downcallHandle(symGemmQ4.get(), descGemm);
-                    MH_GEMM_Q8_0 = linker.downcallHandle(symGemmQ8.get(), descGemm);
-                    loaded = true;
-                    System.out.println("[NativeGemvBackend] Successfully loaded native AVX2 streaming kernels from " + dllPath);
-                }
-            }
+            loaded = true;
+            System.out.println("[NativeGemvBackend] Successfully loaded native AVX2 streaming kernels via FastCore FFM");
         } catch (Throwable t) {
-            System.err.println("[NativeGemvBackend] Warning: Failed to load native AVX2 streaming kernels: " + t.getMessage());
+            System.err.println("[NativeGemvBackend] Warning: Failed to load native AVX2 streaming kernels via FastCore: " + t.getMessage());
             loaded = false;
         }
         AVAILABLE = loaded;
     }
 
-    private NativeGemvBackend() {}
+    private NativeGemvBackend() {
+        // Utility class
+    }
 
     public static boolean isAvailable() {
         return AVAILABLE;
-    }
-
-    private static Path resolveAndExtractDll() {
-        String os = System.getProperty("os.name", "").toLowerCase();
-        if (!os.contains("win")) {
-            return null; // Windows x64 AVX2 initially
-        }
-        String libName = "fastai_streaming_kernels.dll";
-
-        // 1. Check current build target directories
-        String[] candidatePaths = {
-                "fastaimodel-streaming/src/main/resources/win32-x64/" + libName,
-                "src/main/resources/win32-x64/" + libName,
-                libName
-        };
-        for (String c : candidatePaths) {
-            File f = new File(c);
-            if (f.exists() && f.isFile()) {
-                return f.toPath().toAbsolutePath();
-            }
-        }
-
-        // 2. Extract from JAR resource if bundled
-        try (InputStream in = NativeGemvBackend.class.getResourceAsStream("/win32-x64/" + libName)) {
-            if (in != null) {
-                Path tempDll = Files.createTempFile("fastai_streaming_kernels_", ".dll");
-                tempDll.toFile().deleteOnExit();
-                Files.copy(in, tempDll, StandardCopyOption.REPLACE_EXISTING);
-                return tempDll;
-            }
-        } catch (Throwable ignored) {}
-
-        return null;
     }
 
     /**
@@ -120,7 +81,7 @@ public final class NativeGemvBackend {
                                 float[] vecIn, float[] vecOut,
                                 int outRows, int inCols, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = MemorySegment.ofAddress(rawAddress);
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
 
         MemorySegment inSegment = MemorySegment.ofArray(vecIn);
         MemorySegment outSegment = MemorySegment.ofArray(vecOut);
@@ -135,7 +96,7 @@ public final class NativeGemvBackend {
                                 float[] vecIn, float[] vecOut,
                                 int outRows, int inCols, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = MemorySegment.ofAddress(rawAddress);
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
 
         MemorySegment inSegment = MemorySegment.ofArray(vecIn);
         MemorySegment outSegment = MemorySegment.ofArray(vecOut);
@@ -150,7 +111,7 @@ public final class NativeGemvBackend {
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = MemorySegment.ofAddress(rawAddress);
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
 
         // Flatten inBatch to contiguous float[]
         float[] inFlat = new float[batchSize * inCols];
@@ -177,7 +138,7 @@ public final class NativeGemvBackend {
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = MemorySegment.ofAddress(rawAddress);
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
 
         float[] inFlat = new float[batchSize * inCols];
         for (int b = 0; b < batchSize; b++) {
