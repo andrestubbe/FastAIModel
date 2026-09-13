@@ -7,5 +7,6 @@ C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-stream
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\io\ModelResolver.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\tokenizer\GgufTokenizer.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\pipeline\ChunkPipelineScheduler.java
+C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\compute\NativeGemvBackend.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\FastAIStreamingModel.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\compute\GgufDequantizer.java

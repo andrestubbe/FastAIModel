@@ -568,6 +568,21 @@ public class StreamingTransformerEngine implements AutoCloseable {
         int count = rowEnd - rowStart;
         if (count <= 0) return;
 
+        // Native C++ AVX2 Kernel Fast Path via FFM API
+        if (ptr != null && !ptr.isNull() && NativeGemvBackend.isAvailable() && rowStart == 0) {
+            try {
+                if (type == 2) { // Q4_0
+                    NativeGemvBackend.gemvQ4_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                    return;
+                } else if (type == 8) { // Q8_0
+                    NativeGemvBackend.gemvQ8_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                    return;
+                }
+            } catch (Throwable t) {
+                // Fall back to pure Java implementation
+            }
+        }
+
         int cores = computePool.getParallelism();
         if (count <= 16 || cores <= 1) {
             computeFusedRowRange(type, heapData, ptr, baseOffset, rowBytes, inCols,
@@ -667,6 +682,21 @@ public class StreamingTransformerEngine implements AutoCloseable {
                                    int rowStart, int rowEnd, int batchSize) {
         int count = rowEnd - rowStart;
         if (count <= 0) return;
+
+        // Native C++ AVX2 Kernel Fast Path via FFM API
+        if (ptr != null && !ptr.isNull() && NativeGemvBackend.isAvailable() && rowStart == 0) {
+            try {
+                if (type == 2) { // Q4_0
+                    NativeGemvBackend.gemmQ4_0(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                    return;
+                } else if (type == 8) { // Q8_0
+                    NativeGemvBackend.gemmQ8_0(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                    return;
+                }
+            } catch (Throwable t) {
+                // Fall back to pure Java implementation
+            }
+        }
 
         int cores = computePool.getParallelism();
         if (count <= 16 || cores <= 1) {
