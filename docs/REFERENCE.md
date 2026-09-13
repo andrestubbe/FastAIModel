@@ -42,21 +42,33 @@ In-process ONNX Runtime embedding engine for vector embeddings.
 
 ## Class: `fastaimodel.streaming.FastAIStreamingModel`
 
-High-throughput AIR-style chunked layer and expert streaming engine implementing `AutoCloseable`. Executes large language models (7B, 14B, 70B, MoE) under configurable memory budgets (512 MB – 2 GB) by dynamically streaming layers from disk into recycled off-heap double buffers.
+High-throughput chunked layer streaming engine implementing `AutoCloseable`. Executes large language models (1.7B, 7B, 14B, 70B, MoE) under configurable memory budgets (512 MB – 2 GB) by dynamically streaming layers from disk into recycled off-heap double buffers using native AVX2 and F16C kernels.
 
 ### Constructors
 
 - `public FastAIStreamingModel(File modelFile)`  
-  Initializes streaming pipeline with the default 512 MB chunk budget and dual-slot off-heap buffer ring.
+  Initializes streaming pipeline with default configuration (512 MB chunk budget, overlapped I/O enabled).
+
+- `public FastAIStreamingModel(File modelFile, StreamingConfig config)`  
+  Initializes streaming pipeline with full customization (`StreamingConfig.builder().chunkBudgetMB(512).overlapIO(true).temperature(0.7f).build()`).
 
 - `public FastAIStreamingModel(File modelFile, long chunkBudgetBytes)`  
-  Initializes streaming pipeline with a custom chunk budget (e.g. `1024L * 1024 * 1024` for 1 GB chunks).
+  Initializes streaming pipeline with a custom byte budget.
+
+### Methods
+
+- `public void stream(String prompt, Consumer<String> tokenCallback)`  
+  Generates text with streaming callback for each emitted token.
+
+- `public void stream(String prompt, int maxTokens, Consumer<String> tokenCallback)`  
+  Generates up to `maxTokens` tokens with streaming callback.
 
 ### Key Features & Internal Architecture
 
+- **`NativeGemvBackend`**: Java 21 Foreign Function & Memory (FFM) downcall bindings to `fastai_streaming_kernels.dll` executing AVX2 GEMV/GEMM for `Q4_0`, `Q8_0`, `Q4_K` and fused multi-head Attention (`compute_attention_avx2`).
 - **`DoubleBufferRing`**: Two page-locked (`Memory.lockPages()`), 32-byte SIMD-aligned off-heap slots allocated via `FastMemory` and referenced by 64-bit `FastPointer`.
 - **`NativeChunkMmap`**: Zero-copy Win32 memory-mapped layer slices with explicit cleaner invocations (`sun.misc.Unsafe`) to eliminate Windows file locks.
 - **`ChunkPipelineScheduler`**: Overlaps chunk prefetching and compute using Java 21 Virtual Threads and AVX2 vector memory copies (`FastSIMD.copy()`).
-- **`PersistentKVCache`**: Retains multi-layer attention key/value states permanently in RAM (~100–300 MB) across layer streaming cycles.
-- **`FastGPU` Integration**: Dispatches layer GEMV operations to Vulkan Compute with automatic fallback to `FastSIMD` (AVX2/AVX-512 CPU).
+- **`PersistentKVCache`**: Retains multi-layer attention key/value states permanently in FP16 precision across layer streaming cycles.
+- **`FastGPU` Integration**: Dispatches layer GEMV operations to Vulkan Compute with automatic fallback to native AVX2 CPU kernels.
 
