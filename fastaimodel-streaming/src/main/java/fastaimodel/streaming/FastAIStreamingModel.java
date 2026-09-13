@@ -35,6 +35,40 @@ public class FastAIStreamingModel implements AutoCloseable {
     private FastGPU gpuContext;
     private boolean isGpuActive = false;
 
+    public static FastAIStreamingModel open(String modelPath) throws Exception {
+        return new FastAIStreamingModel(modelPath);
+    }
+
+    public static FastAIStreamingModel open(File modelFile) throws Exception {
+        return new FastAIStreamingModel(modelFile);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public FastAIStreamingModel(String modelPath) throws Exception {
+        this(modelPath, 512, false);
+    }
+
+    public FastAIStreamingModel(File modelFile) throws Exception {
+        this(modelFile, StreamingConfig.builder().chunkBudgetMB(512).useGPU(false).build());
+    }
+
+    public FastAIStreamingModel(String modelPath, int chunkBudgetMB, boolean useGPU) throws Exception {
+        this(fastaimodel.streaming.io.ModelResolver.resolve(modelPath),
+                StreamingConfig.builder().chunkBudgetMB(chunkBudgetMB).useGPU(useGPU).build());
+    }
+
+    public FastAIStreamingModel(String modelPath, int chunkBudgetMB, boolean useGPU, int contextLength) throws Exception {
+        this(fastaimodel.streaming.io.ModelResolver.resolve(modelPath),
+                StreamingConfig.builder().chunkBudgetMB(chunkBudgetMB).useGPU(useGPU).contextLength(contextLength).build());
+    }
+
+    public FastAIStreamingModel(File modelFile, int chunkBudgetMB, boolean useGPU) throws Exception {
+        this(modelFile, StreamingConfig.builder().chunkBudgetMB(chunkBudgetMB).useGPU(useGPU).build());
+    }
+
     public FastAIStreamingModel(File modelFile, StreamingConfig config) throws Exception {
         this.config = config;
 
@@ -75,10 +109,7 @@ public class FastAIStreamingModel implements AutoCloseable {
         int headDim = indexer.getEmbeddingLength() / Math.max(1, indexer.getHeadCount());
         this.kvCache = new PersistentKVCache(maxTokens, nKvHeads, headDim, nLayers);
 
-        // 8. Transformer Forward-Pass Engine
-        this.computeEngine = new StreamingTransformerEngine(indexer);
-
-        // Acceleration Backend: FastGPU fallback
+        // 8. Acceleration Backend: FastGPU fallback
         if (config.isUseGPU()) {
             try {
                 this.gpuContext = FastGPU.openDefault();
@@ -89,7 +120,10 @@ public class FastAIStreamingModel implements AutoCloseable {
             }
         }
 
-        // 9. Asynchronous Overlapped I/O Pipeline Scheduler
+        // 9. Transformer Forward-Pass Engine
+        this.computeEngine = new StreamingTransformerEngine(indexer, gpuContext);
+
+        // 10. Asynchronous Overlapped I/O Pipeline Scheduler
         this.scheduler = new ChunkPipelineScheduler(bufferRing, mmap, chunks);
     }
 
@@ -263,5 +297,75 @@ public class FastAIStreamingModel implements AutoCloseable {
         return "<|im_start|>system\nYou are a helpful, respectful and honest assistant.<|im_end|>\n"
              + "<|im_start|>user\n" + prompt.trim() + "<|im_end|>\n"
              + "<|im_start|>assistant\n";
+    }
+
+    public static class Builder {
+        private String modelPath;
+        private File modelFile;
+        private int chunkBudgetMB = 512;
+        private int contextLength = 2048;
+        private boolean useGPU = false;
+        private boolean overlapIO = true;
+        private float temperature = 0.7f;
+        private boolean verbose = false;
+
+        public Builder model(String modelPath) {
+            this.modelPath = modelPath;
+            return this;
+        }
+
+        public Builder model(File modelFile) {
+            this.modelFile = modelFile;
+            return this;
+        }
+
+        public Builder chunkBudgetMB(int mb) {
+            this.chunkBudgetMB = mb;
+            return this;
+        }
+
+        public Builder contextLength(int contextLength) {
+            this.contextLength = contextLength;
+            return this;
+        }
+
+        public Builder useGPU(boolean useGPU) {
+            this.useGPU = useGPU;
+            return this;
+        }
+
+        public Builder overlapIO(boolean overlapIO) {
+            this.overlapIO = overlapIO;
+            return this;
+        }
+
+        public Builder temperature(float temperature) {
+            this.temperature = temperature;
+            return this;
+        }
+
+        public Builder verbose(boolean verbose) {
+            this.verbose = verbose;
+            return this;
+        }
+
+        public FastAIStreamingModel build() throws Exception {
+            File targetFile = modelFile;
+            if (targetFile == null && modelPath != null && !modelPath.isBlank()) {
+                targetFile = fastaimodel.streaming.io.ModelResolver.resolve(modelPath);
+            }
+            if (targetFile == null) {
+                throw new IllegalArgumentException("Model file or model path must be specified");
+            }
+            StreamingConfig cfg = StreamingConfig.builder()
+                    .chunkBudgetMB(chunkBudgetMB)
+                    .contextLength(contextLength)
+                    .useGPU(useGPU)
+                    .overlapIO(overlapIO)
+                    .temperature(temperature)
+                    .verbose(verbose)
+                    .build();
+            return new FastAIStreamingModel(targetFile, cfg);
+        }
     }
 }

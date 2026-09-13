@@ -1,5 +1,21 @@
 # FastAIModel Version Changelog
 
+## [0.1.9] — 2026-09-13
+
+### 🚀 Unified API & Architecture
+- **Fluent Builder Pattern for All Engines**:
+  - `FastAIModel.builder()`: Configure context length, GPU offload layers, and model path with full backward compatibility.
+  - `FastAIOnnxModel.builder()`: Fine-tune intra/inter-op thread limits and execution providers.
+  - `FastAIStreamingModel.builder()`: Ergonomic configuration for chunk budgets (MB), hardware acceleration (`useGPU`), and virtual thread I/O pipelining.
+- **Direct-Argument Convenience Constructors**:
+  - Added clean direct-argument constructors to `FastAIStreamingModel` (`new FastAIStreamingModel("mistral:7b", 512, false)`), matching `FastAIModel` and eliminating verbose configuration boilerplate.
+  - Added static factory methods `FastAIModel.open()`, `FastAIOnnxModel.open()`, and `FastAIStreamingModel.open()`.
+- **FastGPU Multi-Vendor Acceleration Wiring**:
+  - Wired `FastGPU` runtime into `StreamingTransformerEngine` for zero-copy layer-wise execution.
+  - Clarified cross-vendor GPU support across NVIDIA GeForce RTX, AMD Radeon, Intel Iris Xe / Arc, and Apple Silicon Metal.
+
+---
+
 ## [0.1.8] — 2026-09-13
 
 ### 🌊 fastaimodel-streaming (Zero-Copy Layer-wise Streaming)

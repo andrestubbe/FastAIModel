@@ -131,6 +131,7 @@ public class StreamingTransformerEngine implements AutoCloseable {
     }
 
     private BatchWorkspace cachedWorkspace;
+    private fastgpu.FastGPU gpuContext;
 
     public synchronized BatchWorkspace getOrCreateBatchWorkspace(int batchSize) {
         if (cachedWorkspace == null || cachedWorkspace.capacity < batchSize) {
@@ -141,7 +142,12 @@ public class StreamingTransformerEngine implements AutoCloseable {
     }
 
     public StreamingTransformerEngine(GgufTensorIndexer indexer) throws Exception {
+        this(indexer, null);
+    }
+
+    public StreamingTransformerEngine(GgufTensorIndexer indexer, fastgpu.FastGPU gpuContext) throws Exception {
         this.indexer = indexer;
+        this.gpuContext = gpuContext;
         this.modelFile = indexer.getFile();
         this.dim = indexer.getEmbeddingLength();
         this.nHeads = indexer.getHeadCount();

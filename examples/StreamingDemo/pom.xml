@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastAIModel</artifactId>
-        <version>0.1.8</version>
+        <version>0.1.9</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -21,12 +21,12 @@
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>fastaimodel-streaming</artifactId>
-            <version>0.1.8</version>
+            <version>0.1.9</version>
         </dependency>
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>fastaimodel-llama</artifactId>
-            <version>0.1.8</version>
+            <version>0.1.9</version>
         </dependency>
     </dependencies>
 

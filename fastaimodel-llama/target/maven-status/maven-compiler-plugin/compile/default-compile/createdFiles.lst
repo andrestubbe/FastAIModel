@@ -1,3 +1,4 @@
 fastaimodel\FastAIModel$TokenCallback.class
 fastaimodel\OllamaModelResolver.class
+fastaimodel\FastAIModel$Builder.class
 fastaimodel\FastAIModel.class

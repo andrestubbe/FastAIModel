@@ -49,6 +49,14 @@ public class FastAIModel implements AutoCloseable {
         void onToken(String token);
     }
 
+    public static FastAIModel open(String modelPath) {
+        return new FastAIModel(modelPath);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
     public FastAIModel(String modelPath) {
         this(modelPath, 4096, 0);
     }
@@ -58,6 +66,34 @@ public class FastAIModel implements AutoCloseable {
         this.handle = nativeInit(resolvedPath, ctxSize, gpuLayers);
         if (handle == 0) {
             throw new RuntimeException("Failed to load model: " + resolvedPath);
+        }
+    }
+
+    public static class Builder {
+        private String modelPath;
+        private int contextLength = 4096;
+        private int gpuLayers = 0;
+
+        public Builder model(String modelPath) {
+            this.modelPath = modelPath;
+            return this;
+        }
+
+        public Builder contextLength(int contextLength) {
+            this.contextLength = contextLength;
+            return this;
+        }
+
+        public Builder gpuLayers(int gpuLayers) {
+            this.gpuLayers = gpuLayers;
+            return this;
+        }
+
+        public FastAIModel build() {
+            if (modelPath == null || modelPath.isBlank()) {
+                throw new IllegalArgumentException("modelPath must not be null or blank");
+            }
+            return new FastAIModel(modelPath, contextLength, gpuLayers);
         }
     }
 

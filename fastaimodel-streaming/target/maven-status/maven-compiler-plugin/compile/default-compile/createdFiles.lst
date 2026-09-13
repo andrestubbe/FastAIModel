@@ -20,5 +20,6 @@ fastaimodel\streaming\tokenizer\GgufTokenizer$FastGgufReader.class
 fastaimodel\streaming\FastAIStreamingModel.class
 fastaimodel\streaming\compute\StreamingTransformerEngine.class
 fastaimodel\streaming\compute\StreamingTransformerEngine$BatchWorkspace.class
+fastaimodel\streaming\FastAIStreamingModel$Builder.class
 fastaimodel\streaming\buffer\DoubleBufferRing$SlotState.class
 fastaimodel\streaming\compute\GgufDequantizer.class
