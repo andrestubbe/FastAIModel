@@ -33,6 +33,7 @@ public class StreamingTransformerEngine implements AutoCloseable {
     private static final VectorSpecies<Byte> BYTE_SPECIES = ByteVector.SPECIES_256;   // 32 bytes
     private static final VectorSpecies<Float> FLOAT_SPECIES = FloatVector.SPECIES_256; // 8 floats
     private static final VectorSpecies<Integer> INT_SPECIES = IntVector.SPECIES_256;
+    private static final java.util.concurrent.atomic.AtomicBoolean nativeFallbackLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     private final GgufTensorIndexer indexer;
     private final File modelFile;
@@ -473,15 +474,38 @@ public class StreamingTransformerEngine implements AutoCloseable {
         dispatchFusedGemv(outType, cachedOutputRaw, null, 0L, outRowBytes, dim,
                 normX, logitsBuf, 0, outVocabSize);
 
+        // Apply Repetition Penalty in O(recentTokens.size()) instead of O(vocab * recentTokens)
+        if (recentTokens != null && !recentTokens.isEmpty()) {
+            final float repetitionPenalty = 1.35f;
+            java.util.Map<Integer, Integer> counts = new java.util.HashMap<>(recentTokens.size());
+            for (int p : recentTokens) {
+                if (p >= 0 && p < outVocabSize) {
+                    counts.merge(p, 1, Integer::sum);
+                }
+            }
+            if (temperature <= 0.05f) {
+                // Greedy penalty
+                for (var entry : counts.entrySet()) {
+                    logitsBuf[entry.getKey()] -= (0.5f * entry.getValue());
+                }
+            } else {
+                // Top-K scaled penalty
+                for (var entry : counts.entrySet()) {
+                    int t = entry.getKey();
+                    int cnt = entry.getValue();
+                    float dot = logitsBuf[t];
+                    if (dot > 0) logitsBuf[t] = dot / (repetitionPenalty * cnt);
+                    else         logitsBuf[t] = dot * (repetitionPenalty * cnt);
+                }
+            }
+        }
+
         // Greedy mode (ArgMax) when temperature <= 0.05f
         if (temperature <= 0.05f) {
             float maxLogit = -Float.MAX_VALUE;
             int bestToken = 0;
             for (int t = 0; t < outVocabSize; t++) {
                 float logit = logitsBuf[t];
-                if (recentTokens != null && recentTokens.contains(t)) {
-                    logit -= 0.5f; // lightweight penalty
-                }
                 if (logit > maxLogit) {
                     maxLogit = logit;
                     bestToken = t;
@@ -490,21 +514,10 @@ public class StreamingTransformerEngine implements AutoCloseable {
             return bestToken;
         }
 
-        final float repetitionPenalty = 1.35f;
+        // Top-K Sampling
         Arrays.fill(topScores, -Float.MAX_VALUE);
-
         for (int t = 0; t < outVocabSize; t++) {
             float dot = logitsBuf[t];
-            if (recentTokens != null) {
-                int cnt = 0;
-                for (int p : recentTokens) {
-                    if (p == t) cnt++;
-                }
-                if (cnt > 0) {
-                    if (dot > 0) dot /= (repetitionPenalty * cnt);
-                    else         dot *= (repetitionPenalty * cnt);
-                }
-            }
             if (dot > topScores[TOP_K - 1]) {
                 int pos = TOP_K - 1;
                 while (pos > 0 && dot > topScores[pos - 1]) {
@@ -607,7 +620,9 @@ public class StreamingTransformerEngine implements AutoCloseable {
                     }
                 }
             } catch (Throwable t) {
-                // Fall back to pure Java implementation
+                if (nativeFallbackLogged.compareAndSet(false, true)) {
+                    System.err.println("[StreamingTransformerEngine] Warning: Native GEMV invocation failed, falling back to Java: " + t.getMessage());
+                }
             }
         }
 
@@ -733,7 +748,9 @@ public class StreamingTransformerEngine implements AutoCloseable {
                     }
                 }
             } catch (Throwable t) {
-                // Fall back to pure Java implementation
+                if (nativeFallbackLogged.compareAndSet(false, true)) {
+                    System.err.println("[StreamingTransformerEngine] Warning: Native GEMM invocation failed, falling back to Java: " + t.getMessage());
+                }
             }
         }
 
