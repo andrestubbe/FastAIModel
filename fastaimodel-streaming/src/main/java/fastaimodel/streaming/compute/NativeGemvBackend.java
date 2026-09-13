@@ -75,6 +75,28 @@ public final class NativeGemvBackend {
     }
 
     /**
+     * Executes native AVX2 GEMV for Q4_0 weights from MemorySegment.
+     */
+    public static void gemvQ4_0(MemorySegment weightSegment,
+                                float[] vecIn, float[] vecOut,
+                                int outRows, int inCols, int rowBytes) throws Throwable {
+        MemorySegment inSegment = MemorySegment.ofArray(vecIn);
+        MemorySegment outSegment = MemorySegment.ofArray(vecOut);
+        MH_GEMV_Q4_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, rowBytes);
+    }
+
+    /**
+     * Executes native AVX2 GEMV for Q8_0 weights from MemorySegment.
+     */
+    public static void gemvQ8_0(MemorySegment weightSegment,
+                                float[] vecIn, float[] vecOut,
+                                int outRows, int inCols, int rowBytes) throws Throwable {
+        MemorySegment inSegment = MemorySegment.ofArray(vecIn);
+        MemorySegment outSegment = MemorySegment.ofArray(vecOut);
+        MH_GEMV_Q8_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, rowBytes);
+    }
+
+    /**
      * Executes native AVX2 GEMV for Q4_0 weights.
      */
     public static void gemvQ4_0(Pointer weightsPtr, long offset,
@@ -82,11 +104,7 @@ public final class NativeGemvBackend {
                                 int outRows, int inCols, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
         MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
-
-        MemorySegment inSegment = MemorySegment.ofArray(vecIn);
-        MemorySegment outSegment = MemorySegment.ofArray(vecOut);
-
-        MH_GEMV_Q4_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, rowBytes);
+        gemvQ4_0(weightSegment, vecIn, vecOut, outRows, inCols, rowBytes);
     }
 
     /**
@@ -97,22 +115,15 @@ public final class NativeGemvBackend {
                                 int outRows, int inCols, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
         MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
-
-        MemorySegment inSegment = MemorySegment.ofArray(vecIn);
-        MemorySegment outSegment = MemorySegment.ofArray(vecOut);
-
-        MH_GEMV_Q8_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, rowBytes);
+        gemvQ8_0(weightSegment, vecIn, vecOut, outRows, inCols, rowBytes);
     }
 
     /**
-     * Executes native AVX2 GEMM for Q4_0 weights across multiple batch tokens.
+     * Executes native AVX2 GEMM for Q4_0 weights from MemorySegment.
      */
-    public static void gemmQ4_0(Pointer weightsPtr, long offset,
+    public static void gemmQ4_0(MemorySegment weightSegment,
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
-        long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
-
         // Flatten inBatch to contiguous float[]
         float[] inFlat = new float[batchSize * inCols];
         for (int b = 0; b < batchSize; b++) {
@@ -132,14 +143,11 @@ public final class NativeGemvBackend {
     }
 
     /**
-     * Executes native AVX2 GEMM for Q8_0 weights across multiple batch tokens.
+     * Executes native AVX2 GEMM for Q8_0 weights from MemorySegment.
      */
-    public static void gemmQ8_0(Pointer weightsPtr, long offset,
+    public static void gemmQ8_0(MemorySegment weightSegment,
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
-        long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
-
         float[] inFlat = new float[batchSize * inCols];
         for (int b = 0; b < batchSize; b++) {
             System.arraycopy(inBatch[b], 0, inFlat, b * inCols, inCols);
@@ -154,5 +162,27 @@ public final class NativeGemvBackend {
         for (int b = 0; b < batchSize; b++) {
             System.arraycopy(outFlat, b * outRows, outBatch[b], 0, outRows);
         }
+    }
+
+    /**
+     * Executes native AVX2 GEMM for Q4_0 weights across multiple batch tokens.
+     */
+    public static void gemmQ4_0(Pointer weightsPtr, long offset,
+                                float[][] inBatch, float[][] outBatch,
+                                int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
+        long rawAddress = weightsPtr.address() + offset;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
+        gemmQ4_0(weightSegment, inBatch, outBatch, outRows, inCols, batchSize, rowBytes);
+    }
+
+    /**
+     * Executes native AVX2 GEMM for Q8_0 weights across multiple batch tokens.
+     */
+    public static void gemmQ8_0(Pointer weightsPtr, long offset,
+                                float[][] inBatch, float[][] outBatch,
+                                int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
+        long rawAddress = weightsPtr.address() + offset;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
+        gemmQ8_0(weightSegment, inBatch, outBatch, outRows, inCols, batchSize, rowBytes);
     }
 }

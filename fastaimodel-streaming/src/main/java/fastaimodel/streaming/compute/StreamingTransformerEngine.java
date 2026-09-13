@@ -9,6 +9,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
@@ -270,7 +271,15 @@ public class StreamingTransformerEngine implements AutoCloseable {
             for (int t = 0; t <= pos; t++) {
                 kvCache.getK(layerIdx, t, kvH, localK);
                 float dot = 0.0f;
-                for (int d = 0; d < headDim; d++) {
+                int d = 0;
+                int dLimit = headDim - 3;
+                for (; d < dLimit; d += 4) {
+                    dot += qVec[qOff + d]     * localK[d]
+                         + qVec[qOff + d + 1] * localK[d + 1]
+                         + qVec[qOff + d + 2] * localK[d + 2]
+                         + qVec[qOff + d + 3] * localK[d + 3];
+                }
+                for (; d < headDim; d++) {
                     dot += qVec[qOff + d] * localK[d];
                 }
                 dot *= scale;
@@ -296,7 +305,15 @@ public class StreamingTransformerEngine implements AutoCloseable {
                 float w = localScores[t];
                 if (w > 1e-6f) {
                     kvCache.getV(layerIdx, t, kvH, localV);
-                    for (int d = 0; d < headDim; d++) {
+                    int d = 0;
+                    int dLimit = headDim - 3;
+                    for (; d < dLimit; d += 4) {
+                        outVec[qOff + d]     += w * localV[d];
+                        outVec[qOff + d + 1] += w * localV[d + 1];
+                        outVec[qOff + d + 2] += w * localV[d + 2];
+                        outVec[qOff + d + 3] += w * localV[d + 3];
+                    }
+                    for (; d < headDim; d++) {
                         outVec[qOff + d] += w * localV[d];
                     }
                 }
@@ -569,14 +586,25 @@ public class StreamingTransformerEngine implements AutoCloseable {
         if (count <= 0) return;
 
         // Native C++ AVX2 Kernel Fast Path via FFM API
-        if (ptr != null && !ptr.isNull() && NativeGemvBackend.isAvailable() && rowStart == 0) {
+        if (NativeGemvBackend.isAvailable() && rowStart == 0) {
             try {
-                if (type == 2) { // Q4_0
-                    NativeGemvBackend.gemvQ4_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
-                    return;
-                } else if (type == 8) { // Q8_0
-                    NativeGemvBackend.gemvQ8_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
-                    return;
+                if (ptr != null && !ptr.isNull()) {
+                    if (type == 2) { // Q4_0
+                        NativeGemvBackend.gemvQ4_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        return;
+                    } else if (type == 8) { // Q8_0
+                        NativeGemvBackend.gemvQ8_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        return;
+                    }
+                } else if (heapData != null && baseOffset == 0L) {
+                    MemorySegment heapSegment = MemorySegment.ofArray(heapData);
+                    if (type == 2) { // Q4_0
+                        NativeGemvBackend.gemvQ4_0(heapSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        return;
+                    } else if (type == 8) { // Q8_0
+                        NativeGemvBackend.gemvQ8_0(heapSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        return;
+                    }
                 }
             } catch (Throwable t) {
                 // Fall back to pure Java implementation
@@ -684,14 +712,25 @@ public class StreamingTransformerEngine implements AutoCloseable {
         if (count <= 0) return;
 
         // Native C++ AVX2 Kernel Fast Path via FFM API
-        if (ptr != null && !ptr.isNull() && NativeGemvBackend.isAvailable() && rowStart == 0) {
+        if (NativeGemvBackend.isAvailable() && rowStart == 0) {
             try {
-                if (type == 2) { // Q4_0
-                    NativeGemvBackend.gemmQ4_0(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
-                    return;
-                } else if (type == 8) { // Q8_0
-                    NativeGemvBackend.gemmQ8_0(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
-                    return;
+                if (ptr != null && !ptr.isNull()) {
+                    if (type == 2) { // Q4_0
+                        NativeGemvBackend.gemmQ4_0(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                        return;
+                    } else if (type == 8) { // Q8_0
+                        NativeGemvBackend.gemmQ8_0(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                        return;
+                    }
+                } else if (heapData != null && baseOffset == 0L) {
+                    MemorySegment heapSegment = MemorySegment.ofArray(heapData);
+                    if (type == 2) { // Q4_0
+                        NativeGemvBackend.gemmQ4_0(heapSegment, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                        return;
+                    } else if (type == 8) { // Q8_0
+                        NativeGemvBackend.gemmQ8_0(heapSegment, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                        return;
+                    }
                 }
             } catch (Throwable t) {
                 // Fall back to pure Java implementation
@@ -1042,10 +1081,30 @@ public class StreamingTransformerEngine implements AutoCloseable {
     }
 
     private void rmsNorm(float[] xIn, float[] out, float[] w) {
-        double sumSq = 0.0;
-        for (float v : xIn) sumSq += (double) v * v;
-        float inv = (float) (1.0 / Math.sqrt(sumSq / xIn.length + rmsNormEps));
-        for (int i = 0; i < xIn.length; i++) {
+        int n = xIn.length;
+        int i = 0;
+        int limit = FLOAT_SPECIES.loopBound(n);
+
+        FloatVector sumVec = FloatVector.zero(FLOAT_SPECIES);
+        for (; i < limit; i += FLOAT_SPECIES.length()) {
+            FloatVector vx = FloatVector.fromArray(FLOAT_SPECIES, xIn, i);
+            sumVec = vx.fma(vx, sumVec);
+        }
+        float sumSq = sumVec.reduceLanes(VectorOperators.ADD);
+        for (; i < n; i++) {
+            sumSq += xIn[i] * xIn[i];
+        }
+
+        float inv = (float) (1.0 / Math.sqrt((double) sumSq / n + rmsNormEps));
+        FloatVector vinv = FloatVector.broadcast(FLOAT_SPECIES, inv);
+
+        i = 0;
+        for (; i < limit; i += FLOAT_SPECIES.length()) {
+            FloatVector vx = FloatVector.fromArray(FLOAT_SPECIES, xIn, i);
+            FloatVector vw = FloatVector.fromArray(FLOAT_SPECIES, w, i);
+            vx.mul(vinv).mul(vw).intoArray(out, i);
+        }
+        for (; i < n; i++) {
             out[i] = xIn[i] * inv * w[i];
         }
     }
