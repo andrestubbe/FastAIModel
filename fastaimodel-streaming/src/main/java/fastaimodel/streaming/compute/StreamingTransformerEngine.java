@@ -1126,7 +1126,10 @@ public class StreamingTransformerEngine implements AutoCloseable {
             }
         }
         for (; i < n; i++) {
-            short bits = ptr.getShort(offset + i * 2L);
+            long off = offset + i * 2L;
+            int b0 = ptr.getByte(off) & 0xFF;
+            int b1 = ptr.getByte(off + 1L) & 0xFF;
+            short bits = (short) (b0 | (b1 << 8));
             sum += halfToFloat(bits) * x[i];
         }
         return sum;
