@@ -1,0 +1,6 @@
+* text=auto
+*.c linguist-vendored
+*.cpp linguist-vendored
+*.h linguist-vendored
+scratch/* linguist-vendored
+
