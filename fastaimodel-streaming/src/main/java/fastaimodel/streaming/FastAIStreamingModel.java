@@ -249,8 +249,8 @@ public class FastAIStreamingModel implements AutoCloseable {
             System.out.printf("  • Avg Layer Forward-Pass: %6.1f ms / token%n", (double) totalLayersTimeMs / generatedCount);
             System.out.printf("  • Total Throughput:       %6.2f tokens / sec%n",
                     (double) generatedCount / ((totalSampleTimeMs + totalEmbdTimeMs + totalLayersTimeMs) / 1000.0));
-            System.out.printf("  • Dispatch Execution:     Native AVX2=%d | Java Fallback=%d%n",
-                    StreamingTransformerEngine.nativeCalls.get(), StreamingTransformerEngine.fallbackCalls.get());
+            System.out.printf("  • Dispatch Execution:     FastGPU=%d | Native AVX2=%d | Java Fallback=%d%n",
+                    StreamingTransformerEngine.gpuCalls.get(), StreamingTransformerEngine.nativeCalls.get(), StreamingTransformerEngine.fallbackCalls.get());
             System.out.printf("  • Memory Slicing:         Zero-Copy mmap=%d | Disk I/O Heap=%d%n",
                     StreamingTransformerEngine.zeroCopyMmapCalls.get(), StreamingTransformerEngine.heapDiskCalls.get());
             System.out.printf("--------------------------------------------------------------------------------%n");

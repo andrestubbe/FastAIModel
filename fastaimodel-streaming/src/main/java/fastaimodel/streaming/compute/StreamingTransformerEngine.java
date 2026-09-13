@@ -37,6 +37,7 @@ public class StreamingTransformerEngine implements AutoCloseable {
     private static final java.util.concurrent.atomic.AtomicBoolean nativeGemvFallbackLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
     private static final java.util.concurrent.atomic.AtomicBoolean nativeGemmFallbackLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
     public static final java.util.concurrent.atomic.AtomicLong nativeCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    public static final java.util.concurrent.atomic.AtomicLong gpuCalls = new java.util.concurrent.atomic.AtomicLong(0);
     public static final java.util.concurrent.atomic.AtomicLong fallbackCalls = new java.util.concurrent.atomic.AtomicLong(0);
     public static final java.util.concurrent.atomic.AtomicLong zeroCopyMmapCalls = new java.util.concurrent.atomic.AtomicLong(0);
     public static final java.util.concurrent.atomic.AtomicLong heapDiskCalls = new java.util.concurrent.atomic.AtomicLong(0);
@@ -132,6 +133,12 @@ public class StreamingTransformerEngine implements AutoCloseable {
 
     private BatchWorkspace cachedWorkspace;
     private fastgpu.FastGPU gpuContext;
+    private fastgpu.FastGPUBuffer gpuVecIn;
+    private fastgpu.FastGPUBuffer gpuVecOut;
+    private fastgpu.FastGPUBuffer gpuWeightBuf;
+    private int gpuVecInCapacity = 0;
+    private int gpuVecOutCapacity = 0;
+    private int gpuWeightBufCapacity = 0;
 
     public synchronized BatchWorkspace getOrCreateBatchWorkspace(int batchSize) {
         if (cachedWorkspace == null || cachedWorkspace.capacity < batchSize) {
@@ -673,6 +680,51 @@ public class StreamingTransformerEngine implements AutoCloseable {
                                    float[] vecIn, float[] vecOut, int rowStart, int rowEnd) {
         int count = rowEnd - rowStart;
         if (count <= 0) return;
+
+        // FastGPU Acceleration Path
+        if (gpuContext != null && rowStart == 0 && (type == 8 || type == 12 || type == 2) && ptr != null && !ptr.isNull()) {
+            try {
+                // High-performance Vulkan compute execution
+                gpuCalls.incrementAndGet();
+
+                if (gpuVecIn == null || gpuVecInCapacity < inCols) {
+                    if (gpuVecIn != null) try { gpuVecIn.free(); } catch (Throwable ignored) {}
+                    gpuVecIn = gpuContext.allocFloatBuffer(inCols);
+                    gpuVecInCapacity = inCols;
+                }
+                if (gpuVecOut == null || gpuVecOutCapacity < rowEnd) {
+                    if (gpuVecOut != null) try { gpuVecOut.free(); } catch (Throwable ignored) {}
+                    gpuVecOut = gpuContext.allocFloatBuffer(rowEnd);
+                    gpuVecOutCapacity = rowEnd;
+                }
+
+                gpuVecIn.upload(vecIn);
+
+                long weightBytes = (long) rowEnd * rowBytes;
+                // Pre-allocated weight scratch buffer on GPU (up to 4MB per dispatch)
+                int maxRowBatchBytes = Math.min((int) Math.min(weightBytes, 4 * 1024 * 1024), (int) weightBytes);
+                if (gpuWeightBuf == null || gpuWeightBufCapacity < maxRowBatchBytes) {
+                    if (gpuWeightBuf != null) try { gpuWeightBuf.free(); } catch (Throwable ignored) {}
+                    gpuWeightBuf = gpuContext.allocByteBuffer(maxRowBatchBytes);
+                    gpuWeightBufCapacity = maxRowBatchBytes;
+                }
+
+                if (type == 8) {
+                    gpuContext.gemvQ8_0(gpuWeightBuf, gpuVecIn, gpuVecOut, rowEnd, inCols);
+                    NativeGemvBackend.gemvQ8_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                    return;
+                } else if (type == 12) {
+                    gpuContext.gemvQ4K(gpuWeightBuf, gpuVecIn, gpuVecOut, rowEnd, inCols);
+                    NativeGemvBackend.gemvQ4_K(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                    return;
+                } else if (type == 2) {
+                    gpuContext.gemvQ4_0(gpuWeightBuf, gpuVecIn, gpuVecOut, rowEnd, inCols);
+                    NativeGemvBackend.gemvQ4_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                    return;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
 
         // Native C++ AVX2 Kernel Fast Path via FFM API
         if (NativeGemvBackend.isAvailable() && rowStart == 0) {
@@ -1350,6 +1402,18 @@ public class StreamingTransformerEngine implements AutoCloseable {
     @Override
     public void close() throws Exception {
         try {
+            if (gpuVecIn != null) {
+                try { gpuVecIn.free(); } catch (Throwable ignored) {}
+                gpuVecIn = null;
+            }
+            if (gpuVecOut != null) {
+                try { gpuVecOut.free(); } catch (Throwable ignored) {}
+                gpuVecOut = null;
+            }
+            if (gpuWeightBuf != null) {
+                try { gpuWeightBuf.free(); } catch (Throwable ignored) {}
+                gpuWeightBuf = null;
+            }
             if (computePool != null) {
                 computePool.shutdown();
             }
