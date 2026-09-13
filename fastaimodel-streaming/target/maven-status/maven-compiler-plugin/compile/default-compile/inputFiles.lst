@@ -1,7 +1,11 @@
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\buffer\DoubleBufferRing.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\buffer\PersistentKVCache.java
+C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\compute\StreamingTransformerEngine.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\StreamingConfig.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\io\GgufTensorIndexer.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\io\NativeChunkMmap.java
+C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\io\ModelResolver.java
+C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\tokenizer\GgufTokenizer.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\pipeline\ChunkPipelineScheduler.java
 C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\FastAIStreamingModel.java
+C:\Users\andre\Documents\2026-08-17-Work-FastJava\FastAIModel\fastaimodel-streaming\src\main\java\fastaimodel\streaming\compute\GgufDequantizer.java

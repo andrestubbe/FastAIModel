@@ -40,7 +40,7 @@ public class StreamingSanityTest {
             assertTrue(model.getChunkCount() >= 4, "Should create at least 4 chunks");
 
             List<String> generatedTokens = new ArrayList<>();
-            model.stream("Hello test", generatedTokens::add);
+            model.stream("Hello test", 8, generatedTokens::add);
 
             assertFalse(generatedTokens.isEmpty(), "Tokens should have streamed");
             assertEquals(8, generatedTokens.size());

@@ -42,14 +42,26 @@ public class NativeChunkMmap implements AutoCloseable {
         this.channel = raf.getChannel();
     }
 
+    private final java.util.Map<Long, MappedByteBuffer> pointerToBuffer = new java.util.concurrent.ConcurrentHashMap<>();
+
     /**
      * Maps a chunk slice and returns a FastPointer to the 64-bit native virtual memory address.
      */
     public synchronized Pointer mapChunkPointer(long offset, long sizeBytes) throws Exception {
         MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, offset, sizeBytes);
-        mappedBuffers.add(buffer);
         long address = getDirectBufferAddress(buffer);
+        pointerToBuffer.put(address, buffer);
+        mappedBuffers.add(buffer);
         return Pointer.of(address);
+    }
+
+    public synchronized void unmapPointer(Pointer pointer) {
+        if (pointer == null || pointer.isNull()) return;
+        MappedByteBuffer buffer = pointerToBuffer.remove(pointer.address());
+        if (buffer != null) {
+            mappedBuffers.remove(buffer);
+            unmap(buffer);
+        }
     }
 
     public synchronized ByteBuffer mapChunk(long offset, long sizeBytes) throws Exception {

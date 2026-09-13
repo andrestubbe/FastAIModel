@@ -11,7 +11,7 @@ import java.util.concurrent.*;
 
 /**
  * Asynchronous Overlapped I/O and Compute Pipeline Scheduler.
- * Leverages FastSIMD 256-bit AVX2 acceleration and FastPointer addresses.
+ * Loads chunks using true physical file spans, enforcing strict memory boundaries.
  */
 public class ChunkPipelineScheduler implements AutoCloseable {
 
@@ -83,16 +83,19 @@ public class ChunkPipelineScheduler implements AutoCloseable {
     private void loadChunkIntoSlot(LayerChunk chunk, DoubleBufferRing.MemorySlot slot) throws Exception {
         slot.setState(DoubleBufferRing.SlotState.LOADING);
 
-        long startOffset = chunk.tensors().get(0).offset();
-        long totalBytes = chunk.totalBytes();
+        long startOffset = chunk.physicalStartOffset();
+        long spanBytes = chunk.physicalSpanBytes();
 
-        Pointer srcPointer = mmap.mapChunkPointer(startOffset, totalBytes);
+        Pointer srcPointer = mmap.mapChunkPointer(startOffset, spanBytes);
         Pointer dstPointer = slot.getPointer();
 
-        long bytesToCopy = Math.min(slot.getCapacityBytes(), totalBytes);
+        long bytesToCopy = Math.min(slot.getCapacityBytes(), spanBytes);
 
         // FastSIMD 256-bit AVX2 hardware copy
         SIMD.copy(srcPointer, dstPointer, (int) bytesToCopy);
+
+        // Release/unmap temporary file mapping to prevent virtual address exhaustion
+        mmap.unmapPointer(srcPointer);
 
         slot.setCurrentChunkIndex(chunk.chunkIndex());
         slot.setState(DoubleBufferRing.SlotState.READY);

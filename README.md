@@ -13,7 +13,7 @@
 FastAIModel is a **high-performance, modular local AI runtime** for Java that provides three specialized engines:
 1. 🧠 **`fastaimodel-llama`**: In-process GGUF inference via native `llama.cpp` bindings with Vulkan & Apple Metal GPU offloading.
 2. ⚡ **`fastaimodel-onnx`**: Lightweight ONNX Runtime integration for sub-millisecond vector embeddings and deep learning pipelines.
-3. 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise & MoE (Mixture of Experts) Streaming engine executing 7B–70B Dense and MoE models (e.g. Mixtral 8x7B) within ultra-low 1 GB – 2 GB RAM budgets.
+3. 🌊 **`fastaimodel-streaming`** `[🚧 WIP / Experimental]`: Zero-Copy Layer-wise & MoE (Mixture of Experts) Streaming engine executing 7B–70B Dense and MoE models (e.g. Mixtral 8x7B) within ultra-low 1 GB – 2 GB RAM budgets.
 
 [**Watch Demo (YouTube)**](https://www.youtube.com/watch?v=pY-39438feM) | [**Watch the JMH Benchmark**](https://www.youtube.com/watch?v=pY-39438feM)
 
@@ -63,7 +63,11 @@ public class OnnxQuickStart {
 }
 ```
 
-### 3. Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`)
+### 3. Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`) `[🚧 Work In Progress]`
+
+> [!NOTE]
+> **Status: Work In Progress (WIP)**  
+> The Layer-Streaming runtime is currently under active development. While the zero-copy Win32 memory-mapping, double-buffering, and chunk scheduler are functional, numeric forward-pass alignment and quantization kernels are undergoing calibration.
 
 Execute 7B, 14B, 70B Dense models or **MoE architectures (e.g. Mixtral 8x7B)** within an **ultra-low 1 GB – 2 GB RAM budget** (`-Xmx2g`, or any custom limit) using zero-copy Win32 memory-mapped layer and expert streaming:
 
@@ -143,7 +147,7 @@ In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput 
 Choose the module tailored to your workload:
 * 🧠 **`fastaimodel-llama`**: In-process GGUF inference via `llama.cpp` + Vulkan GPU offloading.
 * ⚡ **`fastaimodel-onnx`**: Lightweight in-process ONNX Runtime (embeddings, TTS, vision).
-* 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise Streaming for 7B–70B models under ultra-low RAM budgets.
+* 🌊 **`fastaimodel-streaming`** `[🚧 WIP / Experimental]`: Zero-Copy Layer-wise Streaming for 7B–70B models under ultra-low RAM budgets.
 
 ---
 

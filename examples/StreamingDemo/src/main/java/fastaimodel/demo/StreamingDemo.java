@@ -116,7 +116,7 @@ public class StreamingDemo {
                 for (GgufTensorIndexer.LayerChunk chunk : model.getChunks()) {
                     System.out.printf("  • Chunk #%02d | Layers [%02d - %02d] | Footprint: %6.2f MB | Off-Heap Slot [Recycled]%n",
                             chunk.chunkIndex(), chunk.startLayer(), chunk.endLayer(),
-                            chunk.totalBytes() / (1024.0 * 1024.0));
+                            chunk.physicalSpanBytes() / (1024.0 * 1024.0));
                 }
                 System.out.println("--------------------------------------------------------------------------------\n");
 
