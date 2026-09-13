@@ -1,5 +1,6 @@
 package fastaimodel.streaming.tokenizer;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -11,14 +12,60 @@ import java.util.*;
 /**
  * Pure Java BPE & SentencePiece Tokenizer parsing directly from GGUF metadata.
  * Supports LLaMA / Mistral SentencePiece tokenization with ' ' (\u2581) word boundaries
- * as well as GPT2/SmolLM Byte-Pair Encoding.
+ * as well as GPT2/SmolLM Byte-Pair Encoding and ChatML special tokens.
  */
 public class GgufTokenizer {
 
     public static final int GGUF_MAGIC = 0x46554747;
 
+    // GPT-2 Byte-to-Unicode mapping table (256 bytes -> unicode chars)
+    private static final char[] BYTE_TO_UNICODE = new char[] {
+        256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271,
+        272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287,
+        288, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
+        64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+        80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
+        96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
+        112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 289,
+        290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305,
+        306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321,
+        322, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 323, 174, 175,
+        176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
+        192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
+        208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
+        224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+        240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255
+    };
+
+    // Unicode char -> byte lookup table (for GPT-2 decoding)
+    private static final int[] UNICODE_TO_BYTE = new int[] {
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
+        64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+        80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
+        96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
+        112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, -1, 174, 175,
+        176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
+        192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
+        208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
+        224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+        240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+        32, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141,
+        142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157,
+        158, 159, 160, 173
+    };
+
     private final List<String> vocab = new ArrayList<>();
     private final Map<String, Integer> tokenToId = new HashMap<>();
+    private final Set<Integer> stopTokenIds = new HashSet<>();
     private final float[] scores;
     private int bosTokenId = 1;
     private int eosTokenId = 2;
@@ -26,6 +73,7 @@ public class GgufTokenizer {
     private boolean addBos = true;
     private boolean addEos = false;
     private String modelType = "llama";
+    private final boolean isByteBpe;
 
     public GgufTokenizer(List<String> vocab, float[] scores, int bos, int eos, int unk, boolean addBos, String modelType) {
         this.vocab.addAll(vocab);
@@ -35,9 +83,18 @@ public class GgufTokenizer {
         this.unkTokenId = unk;
         this.addBos = addBos;
         this.modelType = modelType;
+        this.isByteBpe = "gpt2".equalsIgnoreCase(modelType) || "qwen".equalsIgnoreCase(modelType)
+                || "smollm".equalsIgnoreCase(modelType) || "gptneox".equalsIgnoreCase(modelType);
 
         for (int i = 0; i < vocab.size(); i++) {
             tokenToId.putIfAbsent(vocab.get(i), i);
+        }
+
+        if (eos >= 0) stopTokenIds.add(eos);
+        // Register common special stop tokens if present
+        for (String stopName : new String[]{"<|endoftext|>", "<|im_end|>", "</s>", "<eos>"}) {
+            Integer id = tokenToId.get(stopName);
+            if (id != null) stopTokenIds.add(id);
         }
     }
 
@@ -120,20 +177,45 @@ public class GgufTokenizer {
             return result;
         }
 
-        // SentencePiece standard pre-tokenization: replace space with   (\u2581)
-        String normalized = text.replace(" ", "▁");
-        if (!normalized.startsWith("▁") && "llama".equalsIgnoreCase(modelType)) {
-            normalized = "▁" + normalized;
+        if (isByteBpe) {
+            // Split out ChatML and special tokens so they remain intact
+            String[] segments = text.split("(?=<\\|[a-zA-Z0-9_]+\\|>)|(?<=<\\|[a-zA-Z0-9_]+\\|>)");
+            for (String seg : segments) {
+                if (seg.isEmpty()) continue;
+                Integer specId = tokenToId.get(seg);
+                if (specId != null && seg.startsWith("<|") && seg.endsWith("|>")) {
+                    result.add(specId);
+                } else {
+                    // Convert raw segment bytes into BPE unicode characters
+                    byte[] utf8 = seg.getBytes(StandardCharsets.UTF_8);
+                    StringBuilder bpeStr = new StringBuilder(utf8.length);
+                    for (byte b : utf8) {
+                        int ub = b & 0xFF;
+                        bpeStr.append(BYTE_TO_UNICODE[ub]);
+                    }
+                    greedyMatch(bpeStr.toString(), result);
+                }
+            }
+        } else {
+            // SentencePiece (LLaMA / Mistral) maps spaces to \u2581 (' ')
+            String normalized = text.replace(" ", "\u2581");
+            if (!normalized.startsWith("\u2581") && "llama".equalsIgnoreCase(modelType)) {
+                normalized = "\u2581" + normalized;
+            }
+            greedyMatch(normalized, result);
         }
 
-        // Greedy longest match / SentencePiece piece matching
+        return result;
+    }
+
+    private void greedyMatch(String normalized, List<Integer> result) {
         int i = 0;
         int len = normalized.length();
         while (i < len) {
             int longestMatchLen = 0;
             int matchedId = -1;
 
-            int maxCheck = Math.min(len - i, 32);
+            int maxCheck = Math.min(len - i, 48);
             for (int l = maxCheck; l >= 1; l--) {
                 String sub = normalized.substring(i, i + l);
                 Integer id = tokenToId.get(sub);
@@ -159,27 +241,48 @@ public class GgufTokenizer {
                 i++;
             }
         }
-
-        return result;
     }
 
     public String decode(int tokenId) {
         if (tokenId >= 0 && tokenId < vocab.size()) {
             String piece = vocab.get(tokenId);
-            // Replace SentencePiece marker \u2581 with space
-            piece = piece.replace("▁", " ");
-            // Replace GPT-2 / Byte-level BPE marker \u0120 ('Ġ') with space
-            piece = piece.replace("\u0120", " ");
-            // Handle byte tokens like <0x0A> -> \n
-            if (piece.startsWith("<0x") && piece.endsWith(">") && piece.length() == 6) {
-                try {
-                    int b = Integer.parseInt(piece.substring(3, 5), 16);
-                    return String.valueOf((char) b);
-                } catch (NumberFormatException ignored) {}
+
+            // Check if piece is a special token
+            if (piece.startsWith("<|") && piece.endsWith("|>")) {
+                return ""; // Don't print special control tokens in output stream
             }
-            return piece;
+
+            if (isByteBpe) {
+                // Decode GPT-2 BPE characters back to raw UTF-8 bytes
+                ByteArrayOutputStream baos = new ByteArrayOutputStream(piece.length());
+                for (int i = 0; i < piece.length(); i++) {
+                    char c = piece.charAt(i);
+                    if (c < UNICODE_TO_BYTE.length && UNICODE_TO_BYTE[c] != -1) {
+                        baos.write(UNICODE_TO_BYTE[c]);
+                    } else {
+                        byte[] fb = String.valueOf(c).getBytes(StandardCharsets.UTF_8);
+                        baos.write(fb, 0, fb.length);
+                    }
+                }
+                return new String(baos.toByteArray(), StandardCharsets.UTF_8);
+            } else {
+                // Replace SentencePiece marker \u2581 with space
+                piece = piece.replace("\u2581", " ");
+                // Handle byte tokens like <0x0A> -> \n
+                if (piece.startsWith("<0x") && piece.endsWith(">") && piece.length() == 6) {
+                    try {
+                        int b = Integer.parseInt(piece.substring(3, 5), 16);
+                        return String.valueOf((char) b);
+                    } catch (NumberFormatException ignored) {}
+                }
+                return piece;
+            }
         }
         return "";
+    }
+
+    public boolean isStopToken(int tokenId) {
+        return stopTokenIds.contains(tokenId);
     }
 
     public int getVocabSize() { return vocab.size(); }
@@ -187,6 +290,8 @@ public class GgufTokenizer {
     public int getEosTokenId() { return eosTokenId; }
     public int getUnkTokenId() { return unkTokenId; }
     public String getModelType() { return modelType; }
+    public boolean isByteBpe() { return isByteBpe; }
+    public Integer getTokenId(String token) { return tokenToId.get(token); }
 
     // Helpers for binary reading
     private static String readString(FileChannel ch, ByteBuffer b) throws Exception {

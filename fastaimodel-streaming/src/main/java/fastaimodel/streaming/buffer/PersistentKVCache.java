@@ -36,6 +36,7 @@ public class PersistentKVCache implements AutoCloseable {
 
     public int getCurrentTokenIndex() { return currentTokenIndex; }
     public void advanceToken() { if (currentTokenIndex < maxTokens - 1) currentTokenIndex++; }
+    public void advanceTokens(int count) { currentTokenIndex = Math.min(maxTokens - 1, currentTokenIndex + count); }
     public void reset() { currentTokenIndex = 0; kCache.clear(); vCache.clear(); }
     public int getMaxTokens() { return maxTokens; }
 

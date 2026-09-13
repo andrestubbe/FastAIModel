@@ -73,6 +73,11 @@ public class NativeChunkMmap implements AutoCloseable {
     public static long getDirectBufferAddress(ByteBuffer buffer) {
         if (buffer == null || !buffer.isDirect()) return 0L;
         try {
+            if (UNSAFE != null) {
+                Field addressField = java.nio.Buffer.class.getDeclaredField("address");
+                long offset = UNSAFE.objectFieldOffset(addressField);
+                return UNSAFE.getLong(buffer, offset);
+            }
             Field addressField = java.nio.Buffer.class.getDeclaredField("address");
             addressField.setAccessible(true);
             return addressField.getLong(buffer);
@@ -109,5 +114,6 @@ public class NativeChunkMmap implements AutoCloseable {
     }
 
     public File getFile() { return file; }
+    public FileChannel getChannel() { return channel; }
     public long getFileSize() throws Exception { return channel.size(); }
 }

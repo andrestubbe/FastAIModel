@@ -11,12 +11,15 @@ public class StreamingConfig {
     private final boolean useGPU;
     private final float temperature;
 
+    private final boolean verbose;
+
     private StreamingConfig(Builder builder) {
         this.chunkBudgetMB = builder.chunkBudgetMB;
         this.contextLength = builder.contextLength;
         this.overlapIO = builder.overlapIO;
         this.useGPU = builder.useGPU;
         this.temperature = builder.temperature;
+        this.verbose = builder.verbose;
     }
 
     public static Builder builder() {
@@ -37,6 +40,7 @@ public class StreamingConfig {
     public boolean isOverlapIO() { return overlapIO; }
     public boolean isUseGPU() { return useGPU; }
     public float getTemperature() { return temperature; }
+    public boolean isVerbose() { return verbose; }
 
     public static class Builder {
         private int chunkBudgetMB = 1024; // Default 1 GB chunk budget
@@ -44,6 +48,7 @@ public class StreamingConfig {
         private boolean overlapIO = true;
         private boolean useGPU = true;
         private float temperature = 0.7f;
+        private boolean verbose = false;
 
         public Builder chunkBudgetMB(int mb) {
             this.chunkBudgetMB = mb;
@@ -67,6 +72,11 @@ public class StreamingConfig {
 
         public Builder temperature(float temp) {
             this.temperature = temp;
+            return this;
+        }
+
+        public Builder verbose(boolean verbose) {
+            this.verbose = verbose;
             return this;
         }
 

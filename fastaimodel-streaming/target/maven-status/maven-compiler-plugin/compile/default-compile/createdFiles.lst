@@ -5,6 +5,7 @@ fastaimodel\streaming\io\GgufTensorIndexer$LayerChunk.class
 fastaimodel\streaming\pipeline\ChunkPipelineScheduler.class
 fastaimodel\streaming\buffer\DoubleBufferRing.class
 fastaimodel\streaming\tokenizer\GgufTokenizer.class
+fastaimodel\streaming\compute\StreamingTransformerEngine$HeadScratch.class
 fastaimodel\streaming\io\GgufTensorIndexer$RawTensorInfo.class
 fastaimodel\streaming\StreamingConfig$Builder.class
 fastaimodel\streaming\io\ModelResolver.class
@@ -12,7 +13,9 @@ fastaimodel\streaming\pipeline\ChunkPipelineScheduler$ChunkComputeCallback.class
 fastaimodel\streaming\FastAIStreamingModel.class
 fastaimodel\streaming\io\GgufTensorIndexer$TensorEntry.class
 fastaimodel\streaming\compute\StreamingTransformerEngine.class
+fastaimodel\streaming\compute\StreamingTransformerEngine$BatchWorkspace.class
 fastaimodel\streaming\io\NativeChunkMmap.class
 fastaimodel\streaming\StreamingConfig.class
+fastaimodel\streaming\compute\StreamingTransformerEngine$FusedGemvTask.class
 fastaimodel\streaming\buffer\DoubleBufferRing$SlotState.class
 fastaimodel\streaming\compute\GgufDequantizer.class

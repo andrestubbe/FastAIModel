@@ -107,41 +107,57 @@ public class FastAIStreamingModel implements AutoCloseable {
         if (closed.get()) throw new IllegalStateException("FastAIStreamingModel is closed");
 
         long t0 = System.nanoTime();
-        List<Integer> promptTokens = tokenizer.encode(prompt);
+
+        // Format prompt using full SmolLM2 ChatML if model supports ChatML / Byte-BPE and prompt is not already formatted
+        String formattedPrompt = prompt;
+        if (tokenizer.isByteBpe() && !prompt.contains("<|im_start|>")) {
+            formattedPrompt = "<|im_start|>system\nYou are a helpful, respectful and honest assistant.<|im_end|>\n"
+                            + "<|im_start|>user\n" + prompt.trim() + "<|im_end|>\n"
+                            + "<|im_start|>assistant\n";
+        }
+
+        List<Integer> promptTokens = tokenizer.encode(formattedPrompt, false);
         if (promptTokens.isEmpty()) {
             promptTokens.add(tokenizer.getBosTokenId());
         }
         long tTokenizeMs = (System.nanoTime() - t0) / 1_000_000;
-        System.out.printf("[Timing] Tokenization: %d ms (%d prompt tokens: %s)%n", 
-                tTokenizeMs, promptTokens.size(), promptTokens);
+        if (config.isVerbose()) {
+            System.out.printf("[Timing] Tokenization: %d ms (%d prompt tokens: %s)%n", 
+                    tTokenizeMs, promptTokens.size(), promptTokens);
+        }
 
         int dim = indexer.getEmbeddingLength();
         float[] hiddenState = new float[dim];
         int currentPos = 0;
 
-        // Prefill prompt tokens
-        for (int i = 0; i < promptTokens.size(); i++) {
-            int token = promptTokens.get(i);
-            long tEmbd0 = System.nanoTime();
-            computeEngine.getEmbedding(token, hiddenState);
-            long tEmbdMs = (System.nanoTime() - tEmbd0) / 1_000_000;
+        // Batched Prefill for all prompt tokens in a single layer-streaming pass
+        int numPromptTokens = promptTokens.size();
+        float[][] promptXBatch = new float[numPromptTokens][dim];
+        long tEmbd0 = System.nanoTime();
+        for (int i = 0; i < numPromptTokens; i++) {
+            computeEngine.getEmbedding(promptTokens.get(i), promptXBatch[i]);
+        }
+        long tEmbdMs = (System.nanoTime() - tEmbd0) / 1_000_000;
 
-            final int tokenPos = currentPos;
-            long tLayer0 = System.nanoTime();
-            scheduler.executeTokenStep((chunk, weightsPointer) -> {
-                long chunkFileOffset = chunk.physicalStartOffset();
-                long chunkSpanBytes = chunk.physicalSpanBytes();
-                for (int l = chunk.startLayer(); l <= chunk.endLayer(); l++) {
-                    computeEngine.computeLayer(l, hiddenState, weightsPointer, chunkFileOffset, chunkSpanBytes, tokenPos, kvCache);
-                }
-            });
-            long tLayerMs = (System.nanoTime() - tLayer0) / 1_000_000;
+        StreamingTransformerEngine.BatchWorkspace ws = computeEngine.getOrCreateBatchWorkspace(numPromptTokens);
 
-            kvCache.advanceToken();
-            currentPos++;
+        long tBatchLayers0 = System.nanoTime();
+        scheduler.executeTokenStep((chunk, weightsPointer) -> {
+            long chunkFileOffset = chunk.physicalStartOffset();
+            long chunkSpanBytes = chunk.physicalSpanBytes();
+            for (int l = chunk.startLayer(); l <= chunk.endLayer(); l++) {
+                computeEngine.computeLayerBatch(l, promptXBatch, ws, weightsPointer, chunkFileOffset, chunkSpanBytes, 0, numPromptTokens, kvCache);
+            }
+        });
+        long tBatchLayersMs = (System.nanoTime() - tBatchLayers0) / 1_000_000;
 
-            System.out.printf("[Timing] Prefill Token %d/%d (id=%d): Embd=%d ms | Layers=%d ms | Total=%d ms%n",
-                    i + 1, promptTokens.size(), token, tEmbdMs, tLayerMs, (tEmbdMs + tLayerMs));
+        kvCache.advanceTokens(numPromptTokens);
+        currentPos = numPromptTokens;
+        System.arraycopy(promptXBatch[numPromptTokens - 1], 0, hiddenState, 0, dim);
+
+        if (config.isVerbose()) {
+            System.out.printf("[Timing] Batched Prefill (%d tokens): Embd=%d ms | Layers=%d ms | Total=%d ms%n",
+                    numPromptTokens, tEmbdMs, tBatchLayersMs, (tEmbdMs + tBatchLayersMs));
         }
 
         // Autoregressive generation loop
@@ -156,13 +172,13 @@ public class FastAIStreamingModel implements AutoCloseable {
         while (generatedCount < maxTokens) {
             long tGenStep0 = System.nanoTime();
 
-            // 1. Sample next token from logits with Top-K and Repetition Penalty
+            // 1. Sample next token from logits with Top-K or Greedy ArgMax
             long tSample0 = System.nanoTime();
-            nextToken = computeEngine.sampleNextToken(hiddenState, 0.7f, recentTokens);
+            nextToken = computeEngine.sampleNextToken(hiddenState, config.getTemperature(), recentTokens);
             long tSampleMs = (System.nanoTime() - tSample0) / 1_000_000;
             totalSampleTimeMs += tSampleMs;
 
-            if (nextToken == tokenizer.getEosTokenId()) {
+            if (tokenizer.isStopToken(nextToken)) {
                 break;
             }
 
@@ -170,7 +186,9 @@ public class FastAIStreamingModel implements AutoCloseable {
             if (recentTokens.size() > 64) recentTokens.remove(0);
 
             String piece = tokenizer.decode(nextToken);
-            tokenCallback.accept(piece);
+            if (!piece.isEmpty()) {
+                tokenCallback.accept(piece);
+            }
             generatedCount++;
 
             // 2. Forward step for sampled token
@@ -195,7 +213,7 @@ public class FastAIStreamingModel implements AutoCloseable {
             currentPos++;
         }
 
-        if (generatedCount > 0) {
+        if (config.isVerbose() && generatedCount > 0) {
             System.out.printf("%n--------------------------------------------------------------------------------%n");
             System.out.printf(" Inference Step Timings Summary (%d tokens generated):%n", generatedCount);
             System.out.printf("  • Avg Sampling / Logits:  %6.1f ms / token%n", (double) totalSampleTimeMs / generatedCount);
