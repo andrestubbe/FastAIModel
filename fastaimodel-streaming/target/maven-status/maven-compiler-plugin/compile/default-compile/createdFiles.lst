@@ -8,6 +8,7 @@ fastaimodel\streaming\tokenizer\GgufTokenizer.class
 fastaimodel\streaming\compute\StreamingTransformerEngine$HeadScratch.class
 fastaimodel\streaming\io\GgufTensorIndexer$RawTensorInfo.class
 fastaimodel\streaming\StreamingConfig$Builder.class
+fastaimodel\streaming\tokenizer\GgufTokenizer$FastGgufReader.class
 fastaimodel\streaming\io\ModelResolver.class
 fastaimodel\streaming\pipeline\ChunkPipelineScheduler$ChunkComputeCallback.class
 fastaimodel\streaming\FastAIStreamingModel.class

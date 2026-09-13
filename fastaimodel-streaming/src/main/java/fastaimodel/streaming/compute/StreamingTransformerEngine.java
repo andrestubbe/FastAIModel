@@ -696,18 +696,17 @@ public class StreamingTransformerEngine implements AutoCloseable {
                                            int rowBytes, int inCols,
                                            float[][] inBatch, float[][] outBatch,
                                            int rowStart, int rowEnd, int batchSize) {
+        int[] q4Scratch = new int[32];
+        byte[] q8Scratch = new byte[32];
+
         for (int r = rowStart; r < rowEnd; r++) {
             long rowOff = baseOffset + (long) r * rowBytes;
             switch (type) {
                 case 2:  // Q4_0
-                    for (int b = 0; b < batchSize; b++) {
-                        outBatch[b][r] = fusedDotQ4_0(heapData, ptr, rowOff, inBatch[b], inCols);
-                    }
+                    fusedDotQ4_0Batch(heapData, ptr, rowOff, inBatch, outBatch, r, inCols, batchSize, q4Scratch);
                     break;
                 case 8:  // Q8_0
-                    for (int b = 0; b < batchSize; b++) {
-                        outBatch[b][r] = fusedDotQ8_0(heapData, ptr, rowOff, inBatch[b], inCols);
-                    }
+                    fusedDotQ8_0Batch(heapData, ptr, rowOff, inBatch, outBatch, r, inCols, batchSize, q8Scratch);
                     break;
                 case 1:  // F16
                     for (int b = 0; b < batchSize; b++) {
@@ -738,11 +737,108 @@ public class StreamingTransformerEngine implements AutoCloseable {
         }
     }
 
+    private static void fusedDotQ4_0Batch(byte[] heap, Pointer ptr, long offset,
+                                          float[][] inBatch, float[][] outBatch, int r,
+                                          int n, int batchSize, int[] q) {
+        final int blocks = n / Q4_0_BLOCK;
+        long off = offset;
+
+        for (int b = 0; b < batchSize; b++) {
+            outBatch[b][r] = 0.0f;
+        }
+
+        for (int b = 0; b < blocks; b++) {
+            int scaleBits;
+            if (heap != null) {
+                scaleBits = (heap[(int) off] & 0xFF) | ((heap[(int) off + 1] & 0xFF) << 8);
+            } else {
+                scaleBits = (ptr.getByte(off) & 0xFF) | ((ptr.getByte(off + 1) & 0xFF) << 8);
+            }
+            float scale = halfToFloat((short) scaleBits);
+            off += 2;
+
+            if (heap != null) {
+                for (int i = 0; i < 16; i++) {
+                    int byteVal = heap[(int) off + i] & 0xFF;
+                    q[i * 2]     = (byteVal & 0x0F) - 8;
+                    q[i * 2 + 1] = (byteVal >>> 4) - 8;
+                }
+            } else {
+                long p0 = ptr.getLong(off);
+                long p1 = ptr.getLong(off + 8);
+                for (int i = 0; i < 8; i++) {
+                    int byteVal = (int) ((p0 >>> (i * 8)) & 0xFF);
+                    q[i * 2]     = (byteVal & 0x0F) - 8;
+                    q[i * 2 + 1] = (byteVal >>> 4) - 8;
+                }
+                for (int i = 0; i < 8; i++) {
+                    int byteVal = (int) ((p1 >>> (i * 8)) & 0xFF);
+                    q[16 + i * 2]     = (byteVal & 0x0F) - 8;
+                    q[16 + i * 2 + 1] = (byteVal >>> 4) - 8;
+                }
+            }
+            off += 16;
+
+            final int xBase = b * Q4_0_BLOCK;
+
+            for (int t = 0; t < batchSize; t++) {
+                float[] x = inBatch[t];
+                float blockSum = 0.0f;
+                for (int i = 0; i < 32; i++) {
+                    blockSum += q[i] * x[xBase + i];
+                }
+                outBatch[t][r] += scale * blockSum;
+            }
+        }
+    }
+
+    private static void fusedDotQ8_0Batch(byte[] heap, Pointer ptr, long offset,
+                                          float[][] inBatch, float[][] outBatch, int r,
+                                          int n, int batchSize, byte[] q) {
+        final int blocks = n / Q8_0_BLOCK;
+        long off = offset;
+
+        for (int b = 0; b < batchSize; b++) {
+            outBatch[b][r] = 0.0f;
+        }
+
+        for (int b = 0; b < blocks; b++) {
+            int scaleBits = (heap != null)
+                    ? ((heap[(int) off] & 0xFF) | ((heap[(int) off + 1] & 0xFF) << 8))
+                    : ((ptr.getByte(off) & 0xFF) | ((ptr.getByte(off + 1) & 0xFF) << 8));
+            float scale = halfToFloat((short) scaleBits);
+            off += 2;
+
+            if (heap != null) {
+                System.arraycopy(heap, (int) off, q, 0, 32);
+            } else {
+                for (int g = 0; g < 4; g++) {
+                    long packed = ptr.getLong(off + g * 8L);
+                    for (int i = 0; i < 8; i++) {
+                        q[g * 8 + i] = (byte) ((packed >>> (i * 8)) & 0xFF);
+                    }
+                }
+            }
+            off += 32;
+
+            final int xBase = b * Q8_0_BLOCK;
+
+            for (int t = 0; t < batchSize; t++) {
+                float[] x = inBatch[t];
+                float blockSum = 0.0f;
+                for (int i = 0; i < 32; i++) {
+                    blockSum += q[i] * x[xBase + i];
+                }
+                outBatch[t][r] += scale * blockSum;
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Fused kernels – no intermediate FP32 row
     // ------------------------------------------------------------------
 
-    /** Q4_0 – fully vectorized fused dequant + dot (AVX2) */
+    /** Q4_0 – unrolled register FMA with zero ThreadLocal and zero horizontal stalls */
     private static float fusedDotQ4_0(byte[] heap, Pointer ptr, long offset,
                                       float[] x, int n) {
         float sum = 0.0f;
@@ -750,7 +846,6 @@ public class StreamingTransformerEngine implements AutoCloseable {
         long off = offset;
 
         for (int b = 0; b < blocks; b++) {
-            // ---- scale (fp16) ----
             int scaleBits;
             if (heap != null) {
                 scaleBits = (heap[(int) off] & 0xFF) | ((heap[(int) off + 1] & 0xFF) << 8);
@@ -763,47 +858,35 @@ public class StreamingTransformerEngine implements AutoCloseable {
             final int xBase = b * Q4_0_BLOCK;
 
             if (heap != null) {
-                // Heap path – still fast with unrolled scalar (or can also be vectorized)
+                float blockSum = 0.0f;
                 for (int i = 0; i < 16; i++) {
                     int byteVal = heap[(int) off + i] & 0xFF;
                     int q0 = (byteVal & 0x0F) - 8;
                     int q1 = (byteVal >>> 4) - 8;
-                    sum += scale * q0 * x[xBase + i * 2];
-                    sum += scale * q1 * x[xBase + i * 2 + 1];
+                    blockSum += q0 * x[xBase + i * 2] + q1 * x[xBase + i * 2 + 1];
                 }
+                sum += scale * blockSum;
             } else {
-                // ---- Pointer / native path – real AVX2 ----
-                // Load 16 bytes of packed nibbles (two 64-bit loads or one 128-bit)
                 long p0 = ptr.getLong(off);
                 long p1 = ptr.getLong(off + 8);
-
-                // Decode + multiply in two 8-float chunks
-                sum += vectorQ4_0Block(p0, scale, x, xBase);
-                sum += vectorQ4_0Block(p1, scale, x, xBase + 16);
+                float blockSum = 0.0f;
+                for (int i = 0; i < 8; i++) {
+                    int byteVal = (int) ((p0 >>> (i * 8)) & 0xFF);
+                    int q0 = (byteVal & 0x0F) - 8;
+                    int q1 = (byteVal >>> 4) - 8;
+                    blockSum += q0 * x[xBase + i * 2] + q1 * x[xBase + i * 2 + 1];
+                }
+                for (int i = 0; i < 8; i++) {
+                    int byteVal = (int) ((p1 >>> (i * 8)) & 0xFF);
+                    int q0 = (byteVal & 0x0F) - 8;
+                    int q1 = (byteVal >>> 4) - 8;
+                    blockSum += q0 * x[xBase + 16 + i * 2] + q1 * x[xBase + 16 + i * 2 + 1];
+                }
+                sum += scale * blockSum;
             }
             off += 16;
         }
         return sum;
-    }
-
-    /** Processes 8 bytes (= 16 nibbles = 16 weights) with Vector API using recycled ThreadLocal buffer */
-    private static float vectorQ4_0Block(long packed, float scale, float[] x, int xBase) {
-        int[] qs = QS_SCRATCH.get();
-        for (int i = 0; i < 8; i++) {
-            int b = (int) ((packed >>> (i * 8)) & 0xFF);
-            qs[i * 2]     = (b & 0x0F) - 8;
-            qs[i * 2 + 1] = (b >>> 4) - 8;
-        }
-
-        FloatVector xv0 = FloatVector.fromArray(FLOAT_SPECIES, x, xBase);
-        FloatVector xv1 = FloatVector.fromArray(FLOAT_SPECIES, x, xBase + 8);
-
-        FloatVector qv0 = IntVector.fromArray(INT_SPECIES, qs, 0).convert(VectorOperators.I2F, 0)
-                                   .reinterpretAsFloats().mul(scale);
-        FloatVector qv1 = IntVector.fromArray(INT_SPECIES, qs, 8).convert(VectorOperators.I2F, 0)
-                                   .reinterpretAsFloats().mul(scale);
-
-        return qv0.fma(xv0, qv1.mul(xv1)).reduceLanes(VectorOperators.ADD);
     }
 
     /** Q8_0 – vectorized version */
