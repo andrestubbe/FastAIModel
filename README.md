@@ -102,7 +102,8 @@ public class StreamingQuickStart {
 - [Quick Start](#quick-start)
 - [Why FastAIModel?](#why-fastaimodel)
 - [Key Features](#key-features)
-- [Performance Benchmarks](#performance-benchmarks)
+- [Real-World Use Cases](#real-world-use-cases)
+- [Performance & JMH Benchmarks](#performance--jmh-benchmarks)
 - [Installation](#installation)
 - [Documentation](#documentation)
 - [Platform Support](#platform-support)
@@ -135,16 +136,26 @@ Running local AI models usually requires heavy Python microservices or external 
 
 ---
 
-## Performance Benchmarks
+## Real-World Use Cases
 
-In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput and IPC transfer overhead across hardware platforms:
+- 💻 **Low-Memory Desktop & Laptop LLM Execution**: Run full 7B or 14B instruction models (Mistral 7B, Qwen 2.5/3.5, SmolLM2) directly on 8 GB or 16 GB RAM developer workstations using a tiny 512 MB – 1 GB RAM footprint without swapping or OOM crashes.
+- ⚡ **Zero-Latency In-Process Agent Loops**: Drive autonomous agent decision cycles (**[FastAIAgent](https://github.com/andrestubbe/FastAIAgent)**) with in-process token generation, eliminating the 15–30 ms HTTP socket round-trip overhead of external LLM servers.
+- 🚀 **High-Throughput Local Vector Embeddings**: Generate sub-millisecond document and passage embeddings for RAG retrieval (**[FastAIRag](https://github.com/andrestubbe/FastAIRag)** & **[FastAIVectorDB](https://github.com/andrestubbe/FastAIVectorDB)**) using `fastaimodel-onnx` without separate Python/Docker infrastructure.
+- 🔒 **Air-Gapped & Secure Enterprise Pipelines**: Fully embed GGUF models into single self-contained JAR deployments for defense, banking, and confidential environments with zero external network connectivity.
+- 🌐 **Zero-Copy Shared Memory Inter-Process Comms**: Receive multi-megabyte prompt contexts directly from other JVMs or C/Rust processes via **[FastSharedMemory](https://github.com/andrestubbe/FastSharedMemory)** native pointers with sub-microsecond latency.
+
+---
+
+## Performance & JMH Benchmarks
+
+In local GPU and CPU benchmarks, `FastAIModel` measured LLM token generation throughput, memory streaming overhead, and IPC transfer latency across hardware platforms:
 
 | Engine / Platform | Hardware / GPU | Transfer Mode | Prompt Overhead / Latency | Generation Speed |
 |:---|:---|:---:|:---:|:---:|
 | **Standard Socket / HTTP REST** | Network Loopback (`127.0.0.1`) | TCP / HTTP IPC | ~15,000,000 ns (15.0 ms) | ~20–30 Tokens / sec |
 | **FastAIModel (Zero-Copy IPC)** | **FastSharedMemory** | **Native Pointer (`0x7FFF...`)** | **800 ns (0.0008 ms)** | **~51.9 Tokens / sec** |
 | **FastAIModel (Apple Silicon Metal)** | Apple M3 Pro (Metal GPU) | Zero-Copy Unified RAM | **< 200 ns (0.0002 ms)** | **~75–120+ Tokens / sec** |
-| **FastAIModel Streaming (Layer-Wise)** | Intel Iris Xe / NVMe SSD (512MB RAM cap) | Overlapped Win32 Mmap + AVX2 | Local In-Process | **~3–10 Tokens / sec (7B on 4GB RAM laptop)** |
+| **FastAIModel Streaming (AVX2 + F16C)** | Intel Iris Xe / NVMe SSD (512MB RAM cap) | Overlapped Win32 Mmap + Native AVX2 | Local In-Process | **~3–10 Tokens / sec (7B on 4GB free RAM)** |
 
 ---
 
