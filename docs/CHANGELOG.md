@@ -18,13 +18,13 @@
   - Added `--enable-native-access=ALL-UNNAMED` to suppress Java 21 Foreign Function & Memory (FFM) warning banners in interactive demo runs.
 
 ### 🧠 fastaimodel-llama (In-Process GGUF & Vulkan GPU)
-- **FastCore 0.1.2 Alignment**: Synchronized with unified FFM & native library loader.
+- **FastCore 0.1.1 Alignment**: Synchronized with unified FFM & native library loader.
 - **Bundled Native Binaries**: Pre-compiled 64-bit Windows Vulkan / AVX2 runtimes for Intel Iris Xe, AMD Radeon, and NVIDIA RTX.
 - **Direct Ollama Blob Resolver**: Auto-resolves local GGUF models directly from Ollama cache.
 
 ### ⚡ fastaimodel-onnx (In-Process ONNX Runtime)
 - **Zero-C++ DLL Dependency**: Lightweight vector embeddings and deep learning pipelines.
-- **FastCore 0.1.2 Alignment**: Unified parent POM and platform architecture detection.
+- **FastCore 0.1.1 Alignment**: Unified parent POM and platform architecture detection.
 
 ---
 
