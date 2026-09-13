@@ -10,6 +10,7 @@ fastaimodel\streaming\io\NativeChunkMmap.class
 fastaimodel\streaming\StreamingConfig.class
 fastaimodel\streaming\compute\StreamingTransformerEngine$FusedGemvTask.class
 fastaimodel\streaming\buffer\PersistentKVCache.class
+fastaimodel\streaming\compute\NativeGemvBackend$NativeBuffers.class
 fastaimodel\streaming\compute\NativeGemvBackend.class
 fastaimodel\streaming\buffer\DoubleBufferRing.class
 fastaimodel\streaming\compute\StreamingTransformerEngine$HeadScratch.class

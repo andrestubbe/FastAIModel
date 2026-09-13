@@ -9,6 +9,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.List;
@@ -33,7 +34,12 @@ public class StreamingTransformerEngine implements AutoCloseable {
     private static final VectorSpecies<Byte> BYTE_SPECIES = ByteVector.SPECIES_256;   // 32 bytes
     private static final VectorSpecies<Float> FLOAT_SPECIES = FloatVector.SPECIES_256; // 8 floats
     private static final VectorSpecies<Integer> INT_SPECIES = IntVector.SPECIES_256;
-    private static final java.util.concurrent.atomic.AtomicBoolean nativeFallbackLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.concurrent.atomic.AtomicBoolean nativeGemvFallbackLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.concurrent.atomic.AtomicBoolean nativeGemmFallbackLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
+    public static final java.util.concurrent.atomic.AtomicLong nativeCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    public static final java.util.concurrent.atomic.AtomicLong fallbackCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    public static final java.util.concurrent.atomic.AtomicLong zeroCopyMmapCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    public static final java.util.concurrent.atomic.AtomicLong heapDiskCalls = new java.util.concurrent.atomic.AtomicLong(0);
 
     private final GgufTensorIndexer indexer;
     private final File modelFile;
@@ -86,6 +92,7 @@ public class StreamingTransformerEngine implements AutoCloseable {
     private final float[] probsBuf;
 
     private final byte[] cachedOutputRaw;
+    private final MemorySegment cachedOutputSegment;
     private final float[] cachedNormWeights;
     private final float[] logitsBuf;
     private final int outVocabSize;
@@ -191,14 +198,23 @@ public class StreamingTransformerEngine implements AutoCloseable {
             this.outVocabSize = (int) outTensor.shape()[1];
             this.outRowBytes = (int) (outTensor.sizeBytes() / outVocabSize);
             this.outType = outTensor.type();
-            this.cachedOutputRaw = new byte[(int) outTensor.sizeBytes()];
+            long outSizeBytes = outTensor.sizeBytes();
+            this.cachedOutputRaw = new byte[(int) outSizeBytes];
             channel.read(ByteBuffer.wrap(cachedOutputRaw), outTensor.fileOffset());
+            MemorySegment seg = null;
+            try {
+                seg = Arena.ofAuto().allocate(outSizeBytes);
+                MemorySegment.copy(MemorySegment.ofArray(cachedOutputRaw), 0, seg, 0, outSizeBytes);
+            } catch (Throwable ignored) {
+            }
+            this.cachedOutputSegment = seg;
             this.logitsBuf = new float[outVocabSize];
         } else {
             this.outVocabSize = 0;
             this.outRowBytes = 0;
             this.outType = 0;
             this.cachedOutputRaw = null;
+            this.cachedOutputSegment = null;
             this.logitsBuf = null;
         }
 
@@ -504,7 +520,7 @@ public class StreamingTransformerEngine implements AutoCloseable {
         }
 
         // Parallel fused projection into logitsBuf
-        dispatchFusedGemv(outType, cachedOutputRaw, null, 0L, outRowBytes, dim,
+        dispatchFusedGemv(outType, cachedOutputRaw, cachedOutputSegment, null, 0L, outRowBytes, dim,
                 normX, logitsBuf, 0, outVocabSize);
 
         // Apply Repetition Penalty in O(recentTokens.size()) instead of O(vocab * recentTokens)
@@ -614,18 +630,20 @@ public class StreamingTransformerEngine implements AutoCloseable {
                 && (relOffset + entry.sizeBytes() <= chunkSpanBytes);
 
         if (inChunk) {
+            zeroCopyMmapCalls.incrementAndGet();
             // Zero-copy path: work directly on the mmap pointer
-            dispatchFusedGemv(type, null, chunkBase, relOffset, rowBytes, inCols,
+            dispatchFusedGemv(type, null, null, chunkBase, relOffset, rowBytes, inCols,
                     vecIn, vecOut, 0, outRows);
         } else {
+            heapDiskCalls.incrementAndGet();
             // Fallback: load once into a temporary buffer (still only once per GEMV)
             byte[] tensorRaw = readTensorBytesFull(entry);
-            dispatchFusedGemv(type, tensorRaw, null, 0L, rowBytes, inCols,
+            dispatchFusedGemv(type, tensorRaw, null, null, 0L, rowBytes, inCols,
                     vecIn, vecOut, 0, outRows);
         }
     }
 
-    private void dispatchFusedGemv(int type, byte[] heapData, Pointer ptr, long baseOffset,
+    private void dispatchFusedGemv(int type, byte[] heapData, MemorySegment directSegment, Pointer ptr, long baseOffset,
                                    int rowBytes, int inCols,
                                    float[] vecIn, float[] vecOut, int rowStart, int rowEnd) {
         int count = rowEnd - rowStart;
@@ -637,27 +655,33 @@ public class StreamingTransformerEngine implements AutoCloseable {
                 if (ptr != null && !ptr.isNull()) {
                     if (type == 2) { // Q4_0
                         NativeGemvBackend.gemvQ4_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        nativeCalls.incrementAndGet();
                         return;
                     } else if (type == 8) { // Q8_0
                         NativeGemvBackend.gemvQ8_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        nativeCalls.incrementAndGet();
                         return;
                     }
-                } else if (heapData != null && baseOffset == 0L) {
-                    MemorySegment heapSegment = MemorySegment.ofArray(heapData);
+                } else if (directSegment != null && !directSegment.isNative() == false) {
                     if (type == 2) { // Q4_0
-                        NativeGemvBackend.gemvQ4_0(heapSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        NativeGemvBackend.gemvQ4_0(directSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        nativeCalls.incrementAndGet();
                         return;
                     } else if (type == 8) { // Q8_0
-                        NativeGemvBackend.gemvQ8_0(heapSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        NativeGemvBackend.gemvQ8_0(directSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        nativeCalls.incrementAndGet();
                         return;
                     }
                 }
             } catch (Throwable t) {
-                if (nativeFallbackLogged.compareAndSet(false, true)) {
+                if (nativeGemvFallbackLogged.compareAndSet(false, true)) {
                     System.err.println("[StreamingTransformerEngine] Warning: Native GEMV invocation failed, falling back to Java: " + t.getMessage());
+                    t.printStackTrace();
                 }
             }
         }
+
+        fallbackCalls.incrementAndGet();
 
         int cores = computePool.getParallelism();
         if (count <= 16 || cores <= 1) {
@@ -781,8 +805,9 @@ public class StreamingTransformerEngine implements AutoCloseable {
                     }
                 }
             } catch (Throwable t) {
-                if (nativeFallbackLogged.compareAndSet(false, true)) {
+                if (nativeGemmFallbackLogged.compareAndSet(false, true)) {
                     System.err.println("[StreamingTransformerEngine] Warning: Native GEMM invocation failed, falling back to Java: " + t.getMessage());
+                    t.printStackTrace();
                 }
             }
         }

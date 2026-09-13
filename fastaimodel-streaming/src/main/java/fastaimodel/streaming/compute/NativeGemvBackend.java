@@ -3,6 +3,7 @@ package fastaimodel.streaming.compute;
 import fastcore.FastCore;
 import fastpointer.Pointer;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -66,6 +67,31 @@ public final class NativeGemvBackend {
         AVAILABLE = loaded;
     }
 
+    // Reusable thread-local off-heap native memory buffers for GEMV/GEMM downcalls
+    private static final Arena GLOBAL_ARENA = Arena.ofAuto();
+    private static final ThreadLocal<NativeBuffers> THREAD_BUFFERS = ThreadLocal.withInitial(NativeBuffers::new);
+
+    private static final class NativeBuffers {
+        private MemorySegment inBuf = GLOBAL_ARENA.allocate((long) 8192 * 4);
+        private MemorySegment outBuf = GLOBAL_ARENA.allocate((long) 131072 * 4);
+
+        MemorySegment ensureIn(int count) {
+            long reqBytes = (long) count * 4;
+            if (inBuf.byteSize() < reqBytes) {
+                inBuf = GLOBAL_ARENA.allocate(Math.max(reqBytes, inBuf.byteSize() * 2));
+            }
+            return inBuf;
+        }
+
+        MemorySegment ensureOut(int count) {
+            long reqBytes = (long) count * 4;
+            if (outBuf.byteSize() < reqBytes) {
+                outBuf = GLOBAL_ARENA.allocate(Math.max(reqBytes, outBuf.byteSize() * 2));
+            }
+            return outBuf;
+        }
+    }
+
     private NativeGemvBackend() {
         // Utility class
     }
@@ -80,9 +106,13 @@ public final class NativeGemvBackend {
     public static void gemvQ4_0(MemorySegment weightSegment,
                                 float[] vecIn, float[] vecOut,
                                 int outRows, int inCols, int rowBytes) throws Throwable {
-        MemorySegment inSegment = MemorySegment.ofArray(vecIn);
-        MemorySegment outSegment = MemorySegment.ofArray(vecOut);
+        NativeBuffers nb = THREAD_BUFFERS.get();
+        MemorySegment inSegment = nb.ensureIn(inCols);
+        MemorySegment outSegment = nb.ensureOut(outRows);
+
+        MemorySegment.copy(vecIn, 0, inSegment, ValueLayout.JAVA_FLOAT, 0, inCols);
         MH_GEMV_Q4_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, rowBytes);
+        MemorySegment.copy(outSegment, ValueLayout.JAVA_FLOAT, 0, vecOut, 0, outRows);
     }
 
     /**
@@ -91,9 +121,13 @@ public final class NativeGemvBackend {
     public static void gemvQ8_0(MemorySegment weightSegment,
                                 float[] vecIn, float[] vecOut,
                                 int outRows, int inCols, int rowBytes) throws Throwable {
-        MemorySegment inSegment = MemorySegment.ofArray(vecIn);
-        MemorySegment outSegment = MemorySegment.ofArray(vecOut);
+        NativeBuffers nb = THREAD_BUFFERS.get();
+        MemorySegment inSegment = nb.ensureIn(inCols);
+        MemorySegment outSegment = nb.ensureOut(outRows);
+
+        MemorySegment.copy(vecIn, 0, inSegment, ValueLayout.JAVA_FLOAT, 0, inCols);
         MH_GEMV_Q8_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, rowBytes);
+        MemorySegment.copy(outSegment, ValueLayout.JAVA_FLOAT, 0, vecOut, 0, outRows);
     }
 
     /**
@@ -103,7 +137,8 @@ public final class NativeGemvBackend {
                                 float[] vecIn, float[] vecOut,
                                 int outRows, int inCols, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
+        long totalBytes = (long) outRows * rowBytes;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
         gemvQ4_0(weightSegment, vecIn, vecOut, outRows, inCols, rowBytes);
     }
 
@@ -114,7 +149,8 @@ public final class NativeGemvBackend {
                                 float[] vecIn, float[] vecOut,
                                 int outRows, int inCols, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
+        long totalBytes = (long) outRows * rowBytes;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
         gemvQ8_0(weightSegment, vecIn, vecOut, outRows, inCols, rowBytes);
     }
 
@@ -124,21 +160,23 @@ public final class NativeGemvBackend {
     public static void gemmQ4_0(MemorySegment weightSegment,
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
-        // Flatten inBatch to contiguous float[]
-        float[] inFlat = new float[batchSize * inCols];
-        for (int b = 0; b < batchSize; b++) {
-            System.arraycopy(inBatch[b], 0, inFlat, b * inCols, inCols);
-        }
-        float[] outFlat = new float[batchSize * outRows];
+        int totalIn = batchSize * inCols;
+        int totalOut = batchSize * outRows;
 
-        MemorySegment inSegment = MemorySegment.ofArray(inFlat);
-        MemorySegment outSegment = MemorySegment.ofArray(outFlat);
+        NativeBuffers nb = THREAD_BUFFERS.get();
+        MemorySegment inSegment = nb.ensureIn(totalIn);
+        MemorySegment outSegment = nb.ensureOut(totalOut);
+
+        // Copy batch into native contiguous buffer
+        for (int b = 0; b < batchSize; b++) {
+            MemorySegment.copy(inBatch[b], 0, inSegment, ValueLayout.JAVA_FLOAT, (long) b * inCols * 4, inCols);
+        }
 
         MH_GEMM_Q4_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, batchSize, rowBytes);
 
-        // Unflatten outFlat back into outBatch
+        // Copy back to batch
         for (int b = 0; b < batchSize; b++) {
-            System.arraycopy(outFlat, b * outRows, outBatch[b], 0, outRows);
+            MemorySegment.copy(outSegment, ValueLayout.JAVA_FLOAT, (long) b * outRows * 4, outBatch[b], 0, outRows);
         }
     }
 
@@ -148,19 +186,21 @@ public final class NativeGemvBackend {
     public static void gemmQ8_0(MemorySegment weightSegment,
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
-        float[] inFlat = new float[batchSize * inCols];
-        for (int b = 0; b < batchSize; b++) {
-            System.arraycopy(inBatch[b], 0, inFlat, b * inCols, inCols);
-        }
-        float[] outFlat = new float[batchSize * outRows];
+        int totalIn = batchSize * inCols;
+        int totalOut = batchSize * outRows;
 
-        MemorySegment inSegment = MemorySegment.ofArray(inFlat);
-        MemorySegment outSegment = MemorySegment.ofArray(outFlat);
+        NativeBuffers nb = THREAD_BUFFERS.get();
+        MemorySegment inSegment = nb.ensureIn(totalIn);
+        MemorySegment outSegment = nb.ensureOut(totalOut);
+
+        for (int b = 0; b < batchSize; b++) {
+            MemorySegment.copy(inBatch[b], 0, inSegment, ValueLayout.JAVA_FLOAT, (long) b * inCols * 4, inCols);
+        }
 
         MH_GEMM_Q8_0.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, batchSize, rowBytes);
 
         for (int b = 0; b < batchSize; b++) {
-            System.arraycopy(outFlat, b * outRows, outBatch[b], 0, outRows);
+            MemorySegment.copy(outSegment, ValueLayout.JAVA_FLOAT, (long) b * outRows * 4, outBatch[b], 0, outRows);
         }
     }
 
@@ -171,7 +211,8 @@ public final class NativeGemvBackend {
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
+        long totalBytes = (long) outRows * rowBytes;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
         gemmQ4_0(weightSegment, inBatch, outBatch, outRows, inCols, batchSize, rowBytes);
     }
 
@@ -182,7 +223,8 @@ public final class NativeGemvBackend {
                                 float[][] inBatch, float[][] outBatch,
                                 int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
         long rawAddress = weightsPtr.address() + offset;
-        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress);
+        long totalBytes = (long) outRows * rowBytes;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
         gemmQ8_0(weightSegment, inBatch, outBatch, outRows, inCols, batchSize, rowBytes);
     }
 }
