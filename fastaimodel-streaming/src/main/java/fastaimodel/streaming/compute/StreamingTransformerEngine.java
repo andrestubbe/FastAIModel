@@ -306,6 +306,25 @@ public class StreamingTransformerEngine implements AutoCloseable {
 
     private void computeAttention(int layerIdx, float[] qVec, float[] outVec,
                                   int pos, PersistentKVCache kvCache) {
+        if (NativeGemvBackend.isAvailable()) {
+            try {
+                NativeGemvBackend.computeAttention(
+                        nHeads,
+                        nKvHeads,
+                        headDim,
+                        kvCache.getMaxTokens(),
+                        pos,
+                        qVec,
+                        kvCache.getKSegment(layerIdx),
+                        kvCache.getVSegment(layerIdx),
+                        outVec
+                );
+                return;
+            } catch (Throwable t) {
+                // Fallback to Java implementation below if native fails
+            }
+        }
+
         final float scale = (float) (1.0 / Math.sqrt(headDim));
         final int repFactor = Math.max(1, nHeads / nKvHeads);
 
@@ -661,6 +680,10 @@ public class StreamingTransformerEngine implements AutoCloseable {
                         NativeGemvBackend.gemvQ8_0(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
                         nativeCalls.incrementAndGet();
                         return;
+                    } else if (type == 12) { // Q4_K
+                        NativeGemvBackend.gemvQ4_K(ptr, baseOffset, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        nativeCalls.incrementAndGet();
+                        return;
                     }
                 } else if (directSegment != null && !directSegment.isNative() == false) {
                     if (type == 2) { // Q4_0
@@ -669,6 +692,10 @@ public class StreamingTransformerEngine implements AutoCloseable {
                         return;
                     } else if (type == 8) { // Q8_0
                         NativeGemvBackend.gemvQ8_0(directSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
+                        nativeCalls.incrementAndGet();
+                        return;
+                    } else if (type == 12) { // Q4_K
+                        NativeGemvBackend.gemvQ4_K(directSegment, vecIn, vecOut, rowEnd, inCols, rowBytes);
                         nativeCalls.incrementAndGet();
                         return;
                     }
@@ -793,6 +820,9 @@ public class StreamingTransformerEngine implements AutoCloseable {
                     } else if (type == 8) { // Q8_0
                         NativeGemvBackend.gemmQ8_0(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
                         return;
+                    } else if (type == 12) { // Q4_K
+                        NativeGemvBackend.gemmQ4_K(ptr, baseOffset, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                        return;
                     }
                 } else if (heapData != null && baseOffset == 0L) {
                     MemorySegment heapSegment = MemorySegment.ofArray(heapData);
@@ -801,6 +831,9 @@ public class StreamingTransformerEngine implements AutoCloseable {
                         return;
                     } else if (type == 8) { // Q8_0
                         NativeGemvBackend.gemmQ8_0(heapSegment, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
+                        return;
+                    } else if (type == 12) { // Q4_K
+                        NativeGemvBackend.gemmQ4_K(heapSegment, inBatch, outBatch, rowEnd, inCols, batchSize, rowBytes);
                         return;
                     }
                 }

@@ -1,10 +1,10 @@
-# FastAIModel 0.1.7 [ALPHA-2026-08] — Native Local Inference Runtime with GPU Acceleration for Java
+# FastAIModel 0.1.8 [ALPHA-2026-09] — Native Local Inference Runtime with GPU Acceleration for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.7-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.7)
+[![Status](https://img.shields.io/badge/status-0.1.8-brightgreen.svg)](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.8)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
+[![Java](https://img.shields.io/badge/Java-21+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
-[![JitPack](https://img.shields.io/badge/JitPack-0.1.7-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
+[![JitPack](https://img.shields.io/badge/JitPack-0.1.8-green.svg)](https://jitpack.io/#andrestubbe/FastAIModel)
 
 ---
 
@@ -13,7 +13,7 @@
 FastAIModel is a **high-performance, modular local AI runtime** for Java that provides three specialized engines:
 1. 🧠 **`fastaimodel-llama`**: In-process GGUF inference via native `llama.cpp` bindings with Vulkan & Apple Metal GPU offloading.
 2. ⚡ **`fastaimodel-onnx`**: Lightweight ONNX Runtime integration for sub-millisecond vector embeddings and deep learning pipelines.
-3. 🌊 **`fastaimodel-streaming`** `[🚧 WIP / Experimental]`: Zero-Copy Layer-wise & MoE (Mixture of Experts) Streaming engine executing 7B–70B Dense and MoE models (e.g. Mixtral 8x7B) within ultra-low 1 GB – 2 GB RAM budgets.
+3. 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise & MoE Streaming engine executing 7B–70B models (Mistral 7B, Qwen 2.5/3.5, SmolLM2, Mixtral 8x7B) on standard laptops within ultra-low 512 MB – 2 GB RAM budgets using native AVX2 + F16C fused kernels.
 
 [**Watch Demo (YouTube)**](https://www.youtube.com/watch?v=pY-39438feM) | [**Watch the JMH Benchmark**](https://www.youtube.com/watch?v=pY-39438feM)
 
@@ -63,29 +63,33 @@ public class OnnxQuickStart {
 }
 ```
 
-### 3. Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`) `[🚧 Work In Progress]`
+### 3. Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`)
 
-> [!NOTE]
-> **Status: Work In Progress (WIP)**  
-> The Layer-Streaming runtime is currently under active development. While the zero-copy Win32 memory-mapping, double-buffering, and chunk scheduler are functional, numeric forward-pass alignment and quantization kernels are undergoing calibration.
-
-Execute 7B, 14B, 70B Dense models or **MoE architectures (e.g. Mixtral 8x7B)** within an **ultra-low 1 GB – 2 GB RAM budget** (`-Xmx2g`, or any custom limit) using zero-copy Win32 memory-mapped layer and expert streaming:
+Execute 7B, 14B, 70B Dense models or **MoE architectures (e.g. Mixtral 8x7B)** within an **ultra-low 512 MB – 1 GB RAM budget** (`-Xmx2g`, or any custom limit) using zero-copy Win32 memory-mapped layer streaming with hardware-accelerated AVX2 + F16C dot products:
 
 ```java
 import fastaimodel.streaming.FastAIStreamingModel;
+import fastaimodel.streaming.StreamingConfig;
 import fastaimodel.streaming.io.ModelResolver;
 import java.io.File;
 
 public class StreamingQuickStart {
-    public static void main(String[] args) {
-        // Auto-detect any local Ollama model (e.g. smollm2:1.7b, mistral:7b, qwen2.5:14b)
-        File modelFile = ModelResolver.findModelBlob("qwen2.5:7b");
+    public static void main(String[] args) throws Exception {
+        // Auto-detect any local Ollama model (e.g. smollm2:1.7b, mistral:7b, qwen2.5:7b)
+        File modelFile = ModelResolver.resolve("mistral:7b");
 
-        // Initialize streaming engine with a configurable 512 MB chunk budget
-        try (FastAIStreamingModel model = new FastAIStreamingModel(modelFile, 512L * 1024 * 1024)) {
-            String prompt = "Explain quantum computing in three sentences:";
-            String output = model.generate(prompt);
-            System.out.println(output);
+        // Initialize streaming engine with a 512 MB off-heap chunk budget (fits in 4 GB free RAM)
+        StreamingConfig config = StreamingConfig.builder()
+                .chunkBudgetMB(512)
+                .overlapIO(true)
+                .temperature(0.7f)
+                .build();
+
+        try (FastAIStreamingModel model = new FastAIStreamingModel(modelFile, config)) {
+            model.stream("Explain quantum computing in three sentences:", 64, token -> {
+                System.out.print(token);
+                System.out.flush();
+            });
         }
     }
 }
@@ -95,7 +99,7 @@ public class StreamingQuickStart {
 
 ## Table of Contents
 
-- [Quick Start](#quick-start--gguf-llm-gpu-accelerated-inference-fastaimodel-llama)
+- [Quick Start](#quick-start)
 - [Why FastAIModel?](#why-fastaimodel)
 - [Key Features](#key-features)
 - [Performance Benchmarks](#performance-benchmarks)
@@ -111,9 +115,9 @@ public class StreamingQuickStart {
 
 Running local AI models usually requires heavy Python microservices or external HTTP servers (e.g. Ollama, LM Studio), adding multi-hundred-millisecond network latencies. FastAIModel solves this by:
 
-- **In-Process JNI Execution** — Runs GGUF models directly inside your JVM process with zero network IPC overhead.
+- **In-Process JNI & FFM Execution** — Runs GGUF models directly inside your JVM process with zero network IPC overhead.
 - **Intel Iris / Vulkan GPU Offloading** — Offloads transformer layers (`n_gpu_layers`) directly to Intel Iris Xe, AMD Radeon, and NVIDIA GeForce GPUs via **[FastGPU](https://github.com/andrestubbe/FastGPU)**.
-- **Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`)** — Stream 7B–70B Dense models and multi-gigabyte **MoE architectures (e.g. Mixtral 8x7B, DeepSeek-MoE)** within an ultra-low 1 GB – 2 GB RAM budget (or any custom limit) via zero-copy Win32 mmap and overlapped Virtual Thread I/O.
+- **Zero-Copy Layer-wise & MoE Streaming (`fastaimodel-streaming`)** — Stream 7B–70B Dense models and multi-gigabyte **MoE architectures (e.g. Mixtral 8x7B, DeepSeek-MoE)** within an ultra-low 512 MB – 1 GB RAM budget via zero-copy Win32 mmap, overlapped Virtual Thread I/O, and native AVX2 Q4_0 / Q8_0 / Q4_K GEMV.
 - **Modular Lightweight Architecture** — Separate clean modules for `llama.cpp` (`fastaimodel-llama`), `ONNX Runtime` (`fastaimodel-onnx`), and `Layer-Streaming` (`fastaimodel-streaming`).
 
 ---
@@ -121,11 +125,12 @@ Running local AI models usually requires heavy Python microservices or external 
 ## Key Features
 
 - **🌊 Zero-Copy Layer-wise & MoE Expert Streaming**: Stream 20B–70B parameters directly from NVMe SSDs into recycled off-heap double-buffers without OOM crashes.
+- **🚀 Native AVX2 & F16C Kernels**: C++ vectorized GEMV/GEMM for `Q4_0`, `Q8_0`, `Q4_K` plus native multi-head Attention (`compute_attention_avx2`).
 - **🌋 Vulkan, Metal & OpenCL GPU Acceleration**: Full GPU layer offloading on Intel Iris, AMD Radeon, NVIDIA GeForce, and **Apple Silicon (M1/M2/M3/M4) Metal** hardware.
 - **⚡ Zero-Copy Shared Memory IPC Integration**: Direct prompt reading from **[FastSharedMemory](https://github.com/andrestubbe/FastSharedMemory)** native memory addresses (`predictFromMemoryAddress`), cutting prompt transfer latency from 15.0 ms down to 800 nanoseconds (**18,000x faster**).
 - **⚡ FlashAttention & Q4_0 KV-Cache**: Fused attention kernels and 4-bit KV-cache quantization for doubled memory bandwidth throughput.
-- **⏱️ Sub-Millisecond First-Token Latency**: Direct JNI bindings provide instant stream callbacks without HTTP delays.
-- **📦 Cross-Platform Native Support**: Bundled high-performance C++ binaries (`fastaimodel.dll`, `libfastaimodel.dylib`, `libfastaimodel.so`).
+- **⏱️ Sub-Millisecond First-Token Latency**: Direct JNI & FFM bindings provide instant stream callbacks without HTTP delays.
+- **📦 Cross-Platform Native Support**: Bundled high-performance C++ binaries (`fastaimodel.dll`, `fastai_streaming_kernels.dll`).
 - **🎛️ Dynamic Context & Layer Control**: Configure context size (`n_ctx`) and GPU offload layers (`n_gpu_layers`) dynamically.
 
 ---
@@ -139,6 +144,7 @@ In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput 
 | **Standard Socket / HTTP REST** | Network Loopback (`127.0.0.1`) | TCP / HTTP IPC | ~15,000,000 ns (15.0 ms) | ~20–30 Tokens / sec |
 | **FastAIModel (Zero-Copy IPC)** | **FastSharedMemory** | **Native Pointer (`0x7FFF...`)** | **800 ns (0.0008 ms)** | **~51.9 Tokens / sec** |
 | **FastAIModel (Apple Silicon Metal)** | Apple M3 Pro (Metal GPU) | Zero-Copy Unified RAM | **< 200 ns (0.0002 ms)** | **~75–120+ Tokens / sec** |
+| **FastAIModel Streaming (Layer-Wise)** | Intel Iris Xe / NVMe SSD (512MB RAM cap) | Overlapped Win32 Mmap + AVX2 | Local In-Process | **~3–10 Tokens / sec (7B on 4GB RAM laptop)** |
 
 ---
 
@@ -147,7 +153,7 @@ In local GPU benchmarks, `FastAIModel` measured LLM token generation throughput 
 Choose the module tailored to your workload:
 * 🧠 **`fastaimodel-llama`**: In-process GGUF inference via `llama.cpp` + Vulkan GPU offloading.
 * ⚡ **`fastaimodel-onnx`**: Lightweight in-process ONNX Runtime (embeddings, TTS, vision).
-* 🌊 **`fastaimodel-streaming`** `[🚧 WIP / Experimental]`: Zero-Copy Layer-wise Streaming for 7B–70B models under ultra-low RAM budgets.
+* 🌊 **`fastaimodel-streaming`**: Zero-Copy Layer-wise Streaming for 7B–70B models under ultra-low RAM budgets.
 
 ---
 
@@ -168,21 +174,21 @@ Add the JitPack repository and the desired engine module(s) to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-llama</artifactId>
-        <version>0.1.7</version>
+        <version>0.1.8</version>
     </dependency>
 
     <!-- 2. Lightweight ONNX Runtime Engine (Zero C++ DLL dependencies) -->
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-onnx</artifactId>
-        <version>0.1.7</version>
+        <version>0.1.8</version>
     </dependency>
 
-    <!-- 3. Zero-Copy Layer-wise Streaming (Run 7B–70B under 1 GB – 2 GB RAM) -->
+    <!-- 3. Zero-Copy Layer-wise Streaming (Run 7B–70B under 512 MB – 1 GB RAM) -->
     <dependency>
         <groupId>com.github.andrestubbe.FastAIModel</groupId>
         <artifactId>fastaimodel-streaming</artifactId>
-        <version>0.1.7</version>
+        <version>0.1.8</version>
     </dependency>
 
     <!-- FastJava Native Acceleration Substrates -->
@@ -214,7 +220,7 @@ Add the JitPack repository and the desired engine module(s) to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastCore</artifactId>
-        <version>0.1.0</version>
+        <version>0.1.1</version>
     </dependency>
 </dependencies>
 ```
@@ -228,9 +234,9 @@ repositories {
 
 dependencies {
     // Pick the module(s) you need:
-    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.7'       // GGUF Engine
-    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-onnx:0.1.7'        // ONNX Engine
-    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-streaming:0.1.7'   // Layer-wise Streaming
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-llama:0.1.8'       // GGUF Engine
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-onnx:0.1.8'        // ONNX Engine
+    implementation 'com.github.andrestubbe.FastAIModel:fastaimodel-streaming:0.1.8'   // Layer-wise Streaming
 
     // FastJava Ecosystem Libraries
     implementation 'com.github.andrestubbe:fastgpu:0.1.1'
@@ -238,21 +244,21 @@ dependencies {
     implementation 'com.github.andrestubbe:FastMemory:0.1.1'
     implementation 'com.github.andrestubbe:FastPointer:0.1.1'
     implementation 'com.github.andrestubbe:FastSharedMemory:0.1.2'
-    implementation 'com.github.andrestubbe:FastCore:0.1.0'
+    implementation 'com.github.andrestubbe:FastCore:0.1.1'
 }
 ```
 
 ### Option 3: Direct Download (No Build Tool)
 
-Download pre-compiled release JARs directly from [GitHub Releases](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.7):
+Download pre-compiled release JARs directly from [GitHub Releases](https://github.com/andrestubbe/FastAIModel/releases/tag/0.1.8):
 
-* 🧠 **[fastaimodel-llama-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-llama-0.1.7.jar)** (GGUF llama.cpp Engine with bundled native DLLs)
-* ⚡ **[fastaimodel-onnx-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-onnx-0.1.7.jar)** (Lightweight ONNX Runtime Engine)
-* 🌊 **[fastaimodel-streaming-0.1.7.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.7/fastaimodel-streaming-0.1.7.jar)** (Zero-Copy Layer-wise Streaming Engine)
+* 🧠 **[fastaimodel-llama-0.1.8.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.8/fastaimodel-llama-0.1.8.jar)** (GGUF llama.cpp Engine with bundled native DLLs)
+* ⚡ **[fastaimodel-onnx-0.1.8.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.8/fastaimodel-onnx-0.1.8.jar)** (Lightweight ONNX Runtime Engine)
+* 🌊 **[fastaimodel-streaming-0.1.8.jar](https://github.com/andrestubbe/FastAIModel/releases/download/0.1.8/fastaimodel-streaming-0.1.8.jar)** (Zero-Copy Layer-wise Streaming Engine)
 * 🌋 **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/v0.1.1/fastgpu-0.1.1.jar)** (Vulkan GPU Acceleration)
 * ⚡ **[FastSharedMemory-0.1.2.jar](https://github.com/andrestubbe/FastSharedMemory/releases/download/0.1.2/FastSharedMemory-0.1.2.jar)** (Zero-Copy Native IPC)
 * 📌 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (64-Bit Native Pointer Arithmetic)
-* ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Cross-Platform JNI Loader)
+* ⚙️ **[fastcore-0.1.1.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.1/fastcore-0.1.1.jar)** (Cross-Platform JNI Loader)
 
 ---
 

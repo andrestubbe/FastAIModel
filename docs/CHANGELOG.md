@@ -1,5 +1,24 @@
 # FastAIModel Version Changelog
 
+## [0.1.8] — 2026-09-13
+
+### Added & Accelerated
+- **Native AVX2 `Q4_K` GEMV/GEMM Kernel**:
+  - Implemented high-performance native C++ AVX2 dot-product and matrix-vector operations for GGML type 12 (`Q4_K` / `Q6_K` scales).
+  - Enables full native execution for `mistral:7b` and modern quantized models with 0 Java fallbacks.
+- **Fused AVX2 + F16C Attention Kernel**:
+  - Replaced Java stream attention loops with native C++ multi-threaded fused attention (`compute_attention_avx2`).
+  - Utilizes hardware F16C conversion (`_mm256_cvtph_ps`) and FMA vectorization over resident FP16 KV-Cache for high-speed multi-head attention.
+- **Dynamic Prompt Templating Engine**:
+  - Automatic template detection supporting both SentencePiece (`[INST] ... [/INST]` for Mistral) and Byte-BPE (`<|im_start|>system...<|im_end|>` for Qwen/SmolLM).
+- **Vision-Block Filter & Dynamic Memory Safeguard**:
+  - Fixed 2 GB `Integer.MAX_VALUE` mmap limit by filtering vision encoder tensors (`v.blk.*`) on multimodal models (e.g. `qwen3.5:9b`).
+  - Strict 1.5 GB physical chunk capping prevents Win32 memory map overflows on massive weights.
+- **Cleaned Runtime Diagnostics**:
+  - Added `--enable-native-access=ALL-UNNAMED` to suppress Java 21 Foreign Function & Memory (FFM) warning banners in interactive demo runs.
+
+---
+
 ## [0.1.7] — 2026-09-11
 
 ### Added

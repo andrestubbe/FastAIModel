@@ -48,7 +48,7 @@ public class GgufTensorIndexer {
     private final List<TensorEntry> nonLayerTensors = new ArrayList<>();
     private long totalWeightBytes = 0;
 
-    private static final Pattern LAYER_PATTERN = Pattern.compile("blk\\.(\\d+)\\.");
+    private static final Pattern LAYER_PATTERN = Pattern.compile("^(?:model\\.)?(?:blk|layers?)\\.(\\d+)\\.");
 
     public GgufTensorIndexer(File file) {
         this.file = Objects.requireNonNull(file, "file must not be null");
@@ -101,8 +101,16 @@ public class GgufTensorIndexer {
                     this.headCountKv = readInt(channel, readBuf);
                 } else if ((architecture + ".attention.layer_norm_rms_epsilon").equals(key) && vtype == 6) {
                     this.rmsNormEps = readFloat(channel, readBuf);
-                } else if ((architecture + ".rope.freq_base").equals(key) && vtype == 6) {
-                    this.ropeFreqBase = readFloat(channel, readBuf);
+                } else if (((architecture + ".rope.freq_base").equals(key) || key.endsWith(".rope.freq_base"))) {
+                    if (vtype == 6) {
+                        this.ropeFreqBase = readFloat(channel, readBuf);
+                    } else if (vtype == 12) {
+                        this.ropeFreqBase = (float) readDouble(channel, readBuf);
+                    } else if (vtype == 4 || vtype == 5) {
+                        this.ropeFreqBase = (float) readInt(channel, readBuf);
+                    } else {
+                        skipValue(channel, readBuf, vtype);
+                    }
                 } else {
                     skipValue(channel, readBuf, vtype);
                 }
@@ -132,9 +140,11 @@ public class GgufTensorIndexer {
                 long sizeBytes = calculateTensorSizeBytes(cur.dims, cur.type);
 
                 int layerIdx = -1;
-                Matcher matcher = LAYER_PATTERN.matcher(cur.name);
-                if (matcher.find()) {
-                    layerIdx = Integer.parseInt(matcher.group(1));
+                if (!cur.name.startsWith("v.") && !cur.name.startsWith("visual.") && !cur.name.startsWith("vision.")) {
+                    Matcher matcher = LAYER_PATTERN.matcher(cur.name);
+                    if (matcher.find()) {
+                        layerIdx = Integer.parseInt(matcher.group(1));
+                    }
                 }
 
                 TensorEntry entry = new TensorEntry(cur.name, layerIdx, cur.dims, cur.type, tensorFileOffset, sizeBytes);
@@ -192,6 +202,10 @@ public class GgufTensorIndexer {
         List<LayerChunk> chunks = new ArrayList<>();
         if (layerMap.isEmpty()) return chunks;
 
+        // Strictly enforce an upper limit of 1.5 GB (well below Integer.MAX_VALUE 2.14 GB)
+        // to guarantee that FileChannel.map never exceeds the 32-bit limit.
+        long effectiveMaxBytes = Math.min(maxChunkBytes, 1_500_000_000L);
+
         int chunkIdx = 0;
         List<TensorEntry> currentChunkTensors = new ArrayList<>();
         int chunkStartLayer = -1;
@@ -210,7 +224,7 @@ public class GgufTensorIndexer {
             testTensors.addAll(layerTensors);
             long span = calculatePhysicalSpan(testTensors);
 
-            if (span > maxChunkBytes && !currentChunkTensors.isEmpty()) {
+            if (span > effectiveMaxBytes && !currentChunkTensors.isEmpty()) {
                 long chunkStartOff = calculateMinOffset(currentChunkTensors);
                 long chunkSpan = calculatePhysicalSpan(currentChunkTensors);
                 chunks.add(new LayerChunk(chunkIdx++, chunkStartLayer, lastLayer, new ArrayList<>(currentChunkTensors), chunkStartOff, chunkSpan));
@@ -302,6 +316,10 @@ public class GgufTensorIndexer {
 
     private static float readFloat(FileChannel ch, ByteBuffer b) throws Exception {
         b.clear(); b.limit(4); readFully(ch, b); b.flip(); return b.getFloat();
+    }
+
+    private static double readDouble(FileChannel ch, ByteBuffer b) throws Exception {
+        b.clear(); b.limit(8); readFully(ch, b); b.flip(); return b.getDouble();
     }
 
     private static void skipValue(FileChannel ch, ByteBuffer b, int vtype) throws Exception {

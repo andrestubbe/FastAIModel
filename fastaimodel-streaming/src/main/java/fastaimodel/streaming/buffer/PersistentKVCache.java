@@ -41,6 +41,26 @@ public class PersistentKVCache implements AutoCloseable {
     public int getMaxTokens() { return maxTokens; }
 
     /**
+     * Returns a MemorySegment slice pointing to the start of K cache for the given layer.
+     * Byte offset = layer * maxTokens * nKvHeads * headDim * 2 bytes.
+     */
+    public java.lang.foreign.MemorySegment getKSegment(int layer) {
+        long baseOffset = (long) layer * maxTokens * nKvHeads * headDim * 2L;
+        long layerBytes = (long) maxTokens * nKvHeads * headDim * 2L;
+        return java.lang.foreign.MemorySegment.ofBuffer(kCache).asSlice(baseOffset, layerBytes);
+    }
+
+    /**
+     * Returns a MemorySegment slice pointing to the start of V cache for the given layer.
+     * Byte offset = layer * maxTokens * nKvHeads * headDim * 2 bytes.
+     */
+    public java.lang.foreign.MemorySegment getVSegment(int layer) {
+        long baseOffset = (long) layer * maxTokens * nKvHeads * headDim * 2L;
+        long layerBytes = (long) maxTokens * nKvHeads * headDim * 2L;
+        return java.lang.foreign.MemorySegment.ofBuffer(vCache).asSlice(baseOffset, layerBytes);
+    }
+
+    /**
      * Store current token K and V vectors for a given layer.
      */
     public void storeKV(int layer, int pos, float[] kVec, float[] vVec) {

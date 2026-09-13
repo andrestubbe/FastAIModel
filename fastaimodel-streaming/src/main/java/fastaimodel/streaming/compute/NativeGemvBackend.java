@@ -26,8 +26,11 @@ public final class NativeGemvBackend {
 
     private static MethodHandle MH_GEMV_Q4_0;
     private static MethodHandle MH_GEMV_Q8_0;
+    private static MethodHandle MH_GEMV_Q4_K;
     private static MethodHandle MH_GEMM_Q4_0;
     private static MethodHandle MH_GEMM_Q8_0;
+    private static MethodHandle MH_GEMM_Q4_K;
+    private static MethodHandle MH_ATTENTION_AVX2;
 
     static {
         boolean loaded = false;
@@ -53,10 +56,26 @@ public final class NativeGemvBackend {
                     ValueLayout.JAVA_INT       // rowBytes
             );
 
+            // void compute_attention_avx2(int nHeads, int nKvHeads, int headDim, int maxTokens, int pos, const float* qVec, const void* kCache, const void* vCache, float* outVec)
+            FunctionDescriptor descAttn = FunctionDescriptor.ofVoid(
+                    ValueLayout.JAVA_INT,      // nHeads
+                    ValueLayout.JAVA_INT,      // nKvHeads
+                    ValueLayout.JAVA_INT,      // headDim
+                    ValueLayout.JAVA_INT,      // maxTokens
+                    ValueLayout.JAVA_INT,      // pos
+                    ValueLayout.ADDRESS,       // qVec
+                    ValueLayout.ADDRESS,       // kCache
+                    ValueLayout.ADDRESS,       // vCache
+                    ValueLayout.ADDRESS        // outVec
+            );
+
             MH_GEMV_Q4_0 = FastCore.lookupFunction(LIB_NAME, "gemv_q4_0_avx2", descGemv, NativeGemvBackend.class);
             MH_GEMV_Q8_0 = FastCore.lookupFunction(LIB_NAME, "gemv_q8_0_avx2", descGemv, NativeGemvBackend.class);
+            MH_GEMV_Q4_K = FastCore.lookupFunction(LIB_NAME, "gemv_q4_k_avx2", descGemv, NativeGemvBackend.class);
             MH_GEMM_Q4_0 = FastCore.lookupFunction(LIB_NAME, "gemm_q4_0_avx2", descGemm, NativeGemvBackend.class);
             MH_GEMM_Q8_0 = FastCore.lookupFunction(LIB_NAME, "gemm_q8_0_avx2", descGemm, NativeGemvBackend.class);
+            MH_GEMM_Q4_K = FastCore.lookupFunction(LIB_NAME, "gemm_q4_k_avx2", descGemm, NativeGemvBackend.class);
+            MH_ATTENTION_AVX2 = FastCore.lookupFunction(LIB_NAME, "compute_attention_avx2", descAttn, NativeGemvBackend.class);
 
             loaded = true;
             System.out.println("[NativeGemvBackend] Successfully loaded native AVX2 streaming kernels via FastCore FFM");
@@ -131,6 +150,21 @@ public final class NativeGemvBackend {
     }
 
     /**
+     * Executes native AVX2 GEMV for Q4_K weights from MemorySegment.
+     */
+    public static void gemvQ4_K(MemorySegment weightSegment,
+                                float[] vecIn, float[] vecOut,
+                                int outRows, int inCols, int rowBytes) throws Throwable {
+        NativeBuffers nb = THREAD_BUFFERS.get();
+        MemorySegment inSegment = nb.ensureIn(inCols);
+        MemorySegment outSegment = nb.ensureOut(outRows);
+
+        MemorySegment.copy(vecIn, 0, inSegment, ValueLayout.JAVA_FLOAT, 0, inCols);
+        MH_GEMV_Q4_K.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, rowBytes);
+        MemorySegment.copy(outSegment, ValueLayout.JAVA_FLOAT, 0, vecOut, 0, outRows);
+    }
+
+    /**
      * Executes native AVX2 GEMV for Q4_0 weights.
      */
     public static void gemvQ4_0(Pointer weightsPtr, long offset,
@@ -152,6 +186,18 @@ public final class NativeGemvBackend {
         long totalBytes = (long) outRows * rowBytes;
         MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
         gemvQ8_0(weightSegment, vecIn, vecOut, outRows, inCols, rowBytes);
+    }
+
+    /**
+     * Executes native AVX2 GEMV for Q4_K weights.
+     */
+    public static void gemvQ4_K(Pointer weightsPtr, long offset,
+                                float[] vecIn, float[] vecOut,
+                                int outRows, int inCols, int rowBytes) throws Throwable {
+        long rawAddress = weightsPtr.address() + offset;
+        long totalBytes = (long) outRows * rowBytes;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
+        gemvQ4_K(weightSegment, vecIn, vecOut, outRows, inCols, rowBytes);
     }
 
     /**
@@ -205,6 +251,30 @@ public final class NativeGemvBackend {
     }
 
     /**
+     * Executes native AVX2 GEMM for Q4_K weights from MemorySegment.
+     */
+    public static void gemmQ4_K(MemorySegment weightSegment,
+                                float[][] inBatch, float[][] outBatch,
+                                int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
+        int totalIn = batchSize * inCols;
+        int totalOut = batchSize * outRows;
+
+        NativeBuffers nb = THREAD_BUFFERS.get();
+        MemorySegment inSegment = nb.ensureIn(totalIn);
+        MemorySegment outSegment = nb.ensureOut(totalOut);
+
+        for (int b = 0; b < batchSize; b++) {
+            MemorySegment.copy(inBatch[b], 0, inSegment, ValueLayout.JAVA_FLOAT, (long) b * inCols * 4, inCols);
+        }
+
+        MH_GEMM_Q4_K.invokeExact(outRows, inCols, weightSegment, inSegment, outSegment, batchSize, rowBytes);
+
+        for (int b = 0; b < batchSize; b++) {
+            MemorySegment.copy(outSegment, ValueLayout.JAVA_FLOAT, (long) b * outRows * 4, outBatch[b], 0, outRows);
+        }
+    }
+
+    /**
      * Executes native AVX2 GEMM for Q4_0 weights across multiple batch tokens.
      */
     public static void gemmQ4_0(Pointer weightsPtr, long offset,
@@ -227,4 +297,48 @@ public final class NativeGemvBackend {
         MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
         gemmQ8_0(weightSegment, inBatch, outBatch, outRows, inCols, batchSize, rowBytes);
     }
+
+    /**
+     * Executes native AVX2 GEMM for Q4_K weights across multiple batch tokens.
+     */
+    public static void gemmQ4_K(Pointer weightsPtr, long offset,
+                                float[][] inBatch, float[][] outBatch,
+                                int outRows, int inCols, int batchSize, int rowBytes) throws Throwable {
+        long rawAddress = weightsPtr.address() + offset;
+        long totalBytes = (long) outRows * rowBytes;
+        MemorySegment weightSegment = FastCore.asMemorySegment(rawAddress, totalBytes);
+        gemmQ4_K(weightSegment, inBatch, outBatch, outRows, inCols, batchSize, rowBytes);
+    }
+
+    /**
+     * Executes native fused AVX2 + F16C Attention over resident FP16 KV cache.
+     */
+    public static void computeAttention(int nHeads, int nKvHeads, int headDim,
+                                        int maxTokens, int pos,
+                                        float[] qVec,
+                                        MemorySegment kCacheLayerSegment,
+                                        MemorySegment vCacheLayerSegment,
+                                        float[] outVec) throws Throwable {
+        NativeBuffers nb = THREAD_BUFFERS.get();
+        int totalDim = nHeads * headDim;
+        MemorySegment qSeg = nb.ensureIn(totalDim);
+        MemorySegment outSeg = nb.ensureOut(totalDim);
+
+        MemorySegment.copy(qVec, 0, qSeg, ValueLayout.JAVA_FLOAT, 0, totalDim);
+
+        MH_ATTENTION_AVX2.invokeExact(
+                nHeads,
+                nKvHeads,
+                headDim,
+                maxTokens,
+                pos,
+                qSeg,
+                kCacheLayerSegment,
+                vCacheLayerSegment,
+                outSeg
+        );
+
+        MemorySegment.copy(outSeg, ValueLayout.JAVA_FLOAT, 0, outVec, 0, totalDim);
+    }
 }
+

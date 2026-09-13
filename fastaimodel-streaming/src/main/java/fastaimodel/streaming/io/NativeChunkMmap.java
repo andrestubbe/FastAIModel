@@ -48,6 +48,12 @@ public class NativeChunkMmap implements AutoCloseable {
      * Maps a chunk slice and returns a FastPointer to the 64-bit native virtual memory address.
      */
     public synchronized Pointer mapChunkPointer(long offset, long sizeBytes) throws Exception {
+        if (sizeBytes > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(String.format(
+                    "Requested chunk mapping size %d bytes (%.2f MB) exceeds Java FileChannel.map limit of 2GB. " +
+                    "Use chunkBudgetMB <= 1500.",
+                    sizeBytes, sizeBytes / (1024.0 * 1024.0)));
+        }
         MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, offset, sizeBytes);
         long address = getDirectBufferAddress(buffer);
         pointerToBuffer.put(address, buffer);

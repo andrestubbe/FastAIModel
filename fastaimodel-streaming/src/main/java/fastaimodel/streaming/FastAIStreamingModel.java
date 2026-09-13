@@ -108,13 +108,7 @@ public class FastAIStreamingModel implements AutoCloseable {
 
         long t0 = System.nanoTime();
 
-        // Format prompt using full SmolLM2 ChatML if model supports ChatML / Byte-BPE and prompt is not already formatted
-        String formattedPrompt = prompt;
-        if (tokenizer.isByteBpe() && !prompt.contains("<|im_start|>")) {
-            formattedPrompt = "<|im_start|>system\nYou are a helpful, respectful and honest assistant.<|im_end|>\n"
-                            + "<|im_start|>user\n" + prompt.trim() + "<|im_end|>\n"
-                            + "<|im_start|>assistant\n";
-        }
+        String formattedPrompt = formatPrompt(prompt);
 
         List<Integer> promptTokens = tokenizer.encode(formattedPrompt, false);
         if (promptTokens.isEmpty()) {
@@ -249,5 +243,25 @@ public class FastAIStreamingModel implements AutoCloseable {
                 gpuContext = null;
             }
         }
+    }
+
+    private String formatPrompt(String prompt) {
+        if (prompt == null || prompt.isBlank()) return prompt;
+        String arch = (indexer.getArchitecture() != null ? indexer.getArchitecture() : "").toLowerCase();
+
+        // Already formatted by caller
+        if (prompt.contains("<|im_start|>") || prompt.contains("[INST]") || prompt.contains("<|start_header_id|>")) {
+            return prompt;
+        }
+
+        // Mistral / Llama-2 style with [INST]
+        if (arch.contains("mistral") || !tokenizer.isByteBpe()) {
+            return "[INST] " + prompt.trim() + " [/INST]";
+        }
+
+        // Default ChatML for Byte-BPE models (SmolLM, Qwen, etc.)
+        return "<|im_start|>system\nYou are a helpful, respectful and honest assistant.<|im_end|>\n"
+             + "<|im_start|>user\n" + prompt.trim() + "<|im_end|>\n"
+             + "<|im_start|>assistant\n";
     }
 }
