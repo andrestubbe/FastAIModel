@@ -2,7 +2,7 @@
 
 ## [0.1.8] — 2026-09-13
 
-### Added & Accelerated
+### 🌊 fastaimodel-streaming (Zero-Copy Layer-wise Streaming)
 - **Native AVX2 `Q4_K` GEMV/GEMM Kernel**:
   - Implemented high-performance native C++ AVX2 dot-product and matrix-vector operations for GGML type 12 (`Q4_K` / `Q6_K` scales).
   - Enables full native execution for `mistral:7b` and modern quantized models with 0 Java fallbacks.
@@ -16,6 +16,15 @@
   - Strict 1.5 GB physical chunk capping prevents Win32 memory map overflows on massive weights.
 - **Cleaned Runtime Diagnostics**:
   - Added `--enable-native-access=ALL-UNNAMED` to suppress Java 21 Foreign Function & Memory (FFM) warning banners in interactive demo runs.
+
+### 🧠 fastaimodel-llama (In-Process GGUF & Vulkan GPU)
+- **FastCore 0.1.2 Alignment**: Synchronized with unified FFM & native library loader.
+- **Bundled Native Binaries**: Pre-compiled 64-bit Windows Vulkan / AVX2 runtimes for Intel Iris Xe, AMD Radeon, and NVIDIA RTX.
+- **Direct Ollama Blob Resolver**: Auto-resolves local GGUF models directly from Ollama cache.
+
+### ⚡ fastaimodel-onnx (In-Process ONNX Runtime)
+- **Zero-C++ DLL Dependency**: Lightweight vector embeddings and deep learning pipelines.
+- **FastCore 0.1.2 Alignment**: Unified parent POM and platform architecture detection.
 
 ---
 
