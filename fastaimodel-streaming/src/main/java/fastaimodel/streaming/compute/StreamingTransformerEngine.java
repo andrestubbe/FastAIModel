@@ -61,6 +61,12 @@ public class StreamingTransformerEngine implements AutoCloseable {
     private final float[] ffnDown;
     private final float[] normWeightsScratch;
 
+    // Precomputed weights and tables (zero disk I/O, zero allocation on hot path)
+    private final float[][] cachedAttnNorm; // [layerCount][dim]
+    private final float[][] cachedFfnNorm;  // [layerCount][dim]
+    private final float[][] cachedRoPECos;  // [maxContext][headDim / 2]
+    private final float[][] cachedRoPESin;  // [maxContext][headDim / 2]
+
     private static final class HeadScratch {
         final float[] kPos;
         final float[] vPos;
@@ -195,6 +201,38 @@ public class StreamingTransformerEngine implements AutoCloseable {
             this.cachedOutputRaw = null;
             this.logitsBuf = null;
         }
+
+        // 1. Preload and dequantize all RMSNorm weights once for all layers
+        int nLayers = indexer.getLayerCount();
+        this.cachedAttnNorm = new float[nLayers][dim];
+        this.cachedFfnNorm = new float[nLayers][dim];
+        for (int l = 0; l < nLayers; l++) {
+            loadNormWeightsDirect("blk." + l + ".attn_norm.weight", cachedAttnNorm[l]);
+            loadNormWeightsDirect("blk." + l + ".ffn_norm.weight", cachedFfnNorm[l]);
+        }
+
+        // 2. Precompute RoPE cos/sin tables for all context positions
+        int halfHeadDim = headDim / 2;
+        this.cachedRoPECos = new float[maxContext][halfHeadDim];
+        this.cachedRoPESin = new float[maxContext][halfHeadDim];
+        for (int p = 0; p < maxContext; p++) {
+            for (int i = 0; i < halfHeadDim; i++) {
+                double freq = 1.0 / Math.pow(ropeFreqBase, (2.0 * i) / headDim);
+                double theta = p * freq;
+                cachedRoPECos[p][i] = (float) Math.cos(theta);
+                cachedRoPESin[p][i] = (float) Math.sin(theta);
+            }
+        }
+    }
+
+    private void loadNormWeightsDirect(String tensorName, float[] target) throws Exception {
+        GgufTensorIndexer.TensorEntry entry = indexer.getTensor(tensorName);
+        if (entry == null) {
+            Arrays.fill(target, 1.0f);
+            return;
+        }
+        byte[] raw = readTensorBytesFull(entry);
+        GgufDequantizer.dequantize(entry.type(), raw, 0, target, 0, dim);
     }
 
     public void getEmbedding(int tokenId, float[] outVec) throws Exception {
@@ -215,9 +253,7 @@ public class StreamingTransformerEngine implements AutoCloseable {
                              long chunkFileOffset, long chunkSpanBytes,
                              int tokenPos, PersistentKVCache kvCache) throws Exception {
         System.arraycopy(x, 0, residual, 0, dim);
-
-        loadAndApplyRMSNorm("blk." + layerIdx + ".attn_norm.weight",
-                x, normX, chunkBase, chunkFileOffset, chunkSpanBytes);
+        rmsNorm(x, normX, cachedAttnNorm[layerIdx]);
 
         gemv("blk." + layerIdx + ".attn_q.weight", normX, q, chunkBase, chunkFileOffset, chunkSpanBytes);
         gemv("blk." + layerIdx + ".attn_k.weight", normX, k, chunkBase, chunkFileOffset, chunkSpanBytes);
@@ -236,8 +272,7 @@ public class StreamingTransformerEngine implements AutoCloseable {
         }
 
         System.arraycopy(x, 0, residual, 0, dim);
-        loadAndApplyRMSNorm("blk." + layerIdx + ".ffn_norm.weight",
-                x, normX, chunkBase, chunkFileOffset, chunkSpanBytes);
+        rmsNorm(x, normX, cachedFfnNorm[layerIdx]);
 
         gemv("blk." + layerIdx + ".ffn_gate.weight", normX, gate, chunkBase, chunkFileOffset, chunkSpanBytes);
         gemv("blk." + layerIdx + ".ffn_up.weight",   normX, up,   chunkBase, chunkFileOffset, chunkSpanBytes);
@@ -326,11 +361,10 @@ public class StreamingTransformerEngine implements AutoCloseable {
                                   Pointer chunkBase, long chunkFileOffset, long chunkSpanBytes,
                                   int startPos, int batchSize, PersistentKVCache kvCache) throws Exception {
         // 1. Attention Norm
-        loadNormWeights("blk." + layerIdx + ".attn_norm.weight", normWeightsScratch,
-                chunkBase, chunkFileOffset, chunkSpanBytes);
+        float[] attnNorm = cachedAttnNorm[layerIdx];
         for (int b = 0; b < batchSize; b++) {
             System.arraycopy(xBatch[b], 0, ws.resBatch[b], 0, dim);
-            rmsNorm(xBatch[b], ws.normXBatch[b], normWeightsScratch);
+            rmsNorm(xBatch[b], ws.normXBatch[b], attnNorm);
         }
 
         // 2. Q, K, V Projections
@@ -365,11 +399,10 @@ public class StreamingTransformerEngine implements AutoCloseable {
         }
 
         // 6. FFN Norm
-        loadNormWeights("blk." + layerIdx + ".ffn_norm.weight", normWeightsScratch,
-                chunkBase, chunkFileOffset, chunkSpanBytes);
+        float[] ffnNorm = cachedFfnNorm[layerIdx];
         for (int b = 0; b < batchSize; b++) {
             System.arraycopy(xBatch[b], 0, ws.resBatch[b], 0, dim);
-            rmsNorm(xBatch[b], ws.normXBatch[b], normWeightsScratch);
+            rmsNorm(xBatch[b], ws.normXBatch[b], ffnNorm);
         }
 
         // 7. FFN Gate & Up
@@ -1127,19 +1160,39 @@ public class StreamingTransformerEngine implements AutoCloseable {
     }
 
     private void applyRoPE(float[] vec, int heads, int pos) {
-        for (int h = 0; h < heads; h++) {
-            int offset = h * headDim;
-            for (int i = 0; i < headDim / 2; i++) {
-                double freq = 1.0 / Math.pow(ropeFreqBase, (2.0 * i) / headDim);
-                double theta = pos * freq;
-                float cos = (float) Math.cos(theta);
-                float sin = (float) Math.sin(theta);
-                int i0 = offset + 2 * i;
-                int i1 = offset + 2 * i + 1;
-                float v0 = vec[i0];
-                float v1 = vec[i1];
-                vec[i0] = v0 * cos - v1 * sin;
-                vec[i1] = v0 * sin + v1 * cos;
+        float[] cosTable = (pos < cachedRoPECos.length) ? cachedRoPECos[pos] : null;
+        float[] sinTable = (pos < cachedRoPESin.length) ? cachedRoPESin[pos] : null;
+        int halfHead = headDim / 2;
+
+        if (cosTable != null && sinTable != null) {
+            for (int h = 0; h < heads; h++) {
+                int offset = h * headDim;
+                for (int i = 0; i < halfHead; i++) {
+                    float cos = cosTable[i];
+                    float sin = sinTable[i];
+                    int i0 = offset + 2 * i;
+                    int i1 = offset + 2 * i + 1;
+                    float v0 = vec[i0];
+                    float v1 = vec[i1];
+                    vec[i0] = v0 * cos - v1 * sin;
+                    vec[i1] = v0 * sin + v1 * cos;
+                }
+            }
+        } else {
+            for (int h = 0; h < heads; h++) {
+                int offset = h * headDim;
+                for (int i = 0; i < halfHead; i++) {
+                    double freq = 1.0 / Math.pow(ropeFreqBase, (2.0 * i) / headDim);
+                    double theta = pos * freq;
+                    float cos = (float) Math.cos(theta);
+                    float sin = (float) Math.sin(theta);
+                    int i0 = offset + 2 * i;
+                    int i1 = offset + 2 * i + 1;
+                    float v0 = vec[i0];
+                    float v1 = vec[i1];
+                    vec[i0] = v0 * cos - v1 * sin;
+                    vec[i1] = v0 * sin + v1 * cos;
+                }
             }
         }
     }
