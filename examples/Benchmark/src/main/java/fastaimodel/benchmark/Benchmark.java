@@ -2,7 +2,7 @@ package fastaimodel.benchmark;
 
 import fastaimodel.FastAIModel;
 
-public class GpuCpuCompare {
+public class Benchmark {
     public static void main(String[] args) {
         String modelPath = "models/qwen2.5-coder-1.5b.gguf";
         String prompt = "Write a quicksort function in Java:";
