@@ -208,9 +208,13 @@ Measured across hardware platforms for token throughput, memory streaming overhe
 
 | Case | Java Example | Launcher | Description |
 |:---|:---|:---|:---|
-| **Zero-Copy Streaming Demo** | [StreamingDemo.java](examples/StreamingDemo/src/main/java/fastaimodel/streaming/StreamingDemo.java) | `run-streaming.bat` | Real-time layer-wise streaming of 7B models under low-RAM budgets. |
+| **Zero-Copy Streaming Demo** | [StreamingDemo.java](examples/StreamingDemo/src/main/java/fastaimodel/streaming/StreamingDemo.java) | `run-streaming.bat` / `run-demo.bat` | Real-time layer-wise streaming of 7B models under low-RAM budgets. |
 | **GGUF Interactive Demo** | [GgufDemo.java](fastaimodel-llama/src/test/java/fastaimodel/GgufDemo.java) | `run-gguf-demo.bat` | Interactive terminal completion with Vulkan GPU layer offloading. |
-| **Hardware Benchmark Suite** | [Benchmark.java](examples/Benchmark/src/main/java/fastaimodel/benchmark/Benchmark.java) | `run-benchmark.bat` | Performance comparison between CPU-only and Vulkan GPU accelerated inference. |
+| **GGUF Silent Headless Demo** | [GgufDemo.java](fastaimodel-llama/src/test/java/fastaimodel/GgufDemo.java) | `run-silent-demo.bat` | Headless execution without console verbosity for automated pipelines. |
+| **ONNX Runtime Demo** | [OnnxDemo.java](fastaimodel-onnx/src/test/java/fastaimodel/OnnxDemo.java) | `run-onnx-demo.bat` | In-process execution of ONNX models (embeddings, TTS, vision). |
+| **Zero-Copy IPC Demo** | [ZeroCopyIpcDemo.java](fastaimodel-llama/src/test/java/fastaimodel/benchmark/ZeroCopyIpcDemo.java) | `run-zerocopy-demo.bat` | Zero-copy shared memory prompt transfer via FastSharedMemory. |
+| **CPU vs GPU Comparison** | [InteractiveOllamaTest.java](fastaimodel-llama/src/test/java/fastaimodel/benchmark/InteractiveOllamaTest.java) | `run-llama-gpu-test.bat` | Direct speed comparison between pure CPU and Intel Iris / Vulkan GPU. |
+| **Hardware Benchmark Suite** | [Benchmark.java](examples/Benchmark/src/main/java/fastaimodel/benchmark/Benchmark.java) | `run-benchmark.bat` | Official JMH throughput and latency benchmarks. |
 
 ---
 
